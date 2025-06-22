@@ -4,9 +4,13 @@ function Cell({
   cellId, 
   value, 
   isSelected, 
+  isInRange,
   isEditing, 
   userSelection, 
   onClick, 
+  onMouseDown,
+  onMouseEnter,
+  onMouseUp,
   onDoubleClick, 
   onEdit, 
   onTabEdit
@@ -26,7 +30,8 @@ function Cell({
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
-      inputRef.current.focus();
+      // Prevent scroll when focusing input in edit mode
+      inputRef.current.focus({ preventScroll: true });
       inputRef.current.select();
     }
   }, [isEditing]);
@@ -69,19 +74,34 @@ function Cell({
     }, 100); // Increased from 10ms to 100ms
   };
 
-  const displayValue = isEditing ? editValue : value;
+  const displayValue = isEditing ? editValue : (typeof value === 'string' ? value : '');
 
   // Check if this cell is in the first row (row 1)
   const isFirstRow = cellId.match(/\d+/)[0] === '1';
 
+  // Determine cell styling based on selection state
+  const getCellClassName = () => {
+    let baseClass = 'relative w-16 sm:w-20 lg:w-24 h-8 border-r border-b border-gray-300 cursor-pointer touch-manipulation';
+    
+    if (isSelected) {
+      baseClass += ' ring-2 ring-blue-500 ring-inset bg-blue-50';
+    } else if (isInRange) {
+      baseClass += ' bg-blue-100 border-blue-300';
+    } else {
+      baseClass += ' bg-white hover:bg-gray-50';
+    }
+    
+    return baseClass;
+  };
+
   return (
     <div
-      className={`
-        relative w-16 sm:w-20 lg:w-24 h-8 border-r border-b border-gray-300 
-        ${isSelected ? 'ring-2 ring-blue-500 ring-inset bg-blue-50' : 'bg-white hover:bg-gray-50'}
-        cursor-pointer touch-manipulation
-      `}
+      id={`cell-${cellId}`}
+      className={getCellClassName()}
       onClick={onClick}
+      onMouseDown={onMouseDown}
+      onMouseEnter={onMouseEnter}
+      onMouseUp={onMouseUp}
       onDoubleClick={onDoubleClick}
     >
       {isEditing ? (
