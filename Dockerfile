@@ -2,18 +2,20 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copy backend files
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy the entire project
+COPY . .
 
-# Copy backend source code
-COPY backend/ .
+# Install dependencies
+RUN cd backend && pip install --no-cache-dir -r requirements.txt
+
+# Make scripts executable
+RUN chmod +x start.sh build.sh
 
 # Create data directory
-RUN mkdir -p data
+RUN mkdir -p backend/data
 
 # Expose port
 EXPOSE 8000
 
 # Start the application
-CMD ["uvicorn", "main:socket_app", "--host", "0.0.0.0", "--port", "8000"] 
+CMD ["./start.sh"] 
