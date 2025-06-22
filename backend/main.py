@@ -278,15 +278,19 @@ def import_csv_to_excel(csv_content: str):
         print(f"Error importing CSV: {e}")
         return {"success": False, "error": str(e)}
 
-# --- On Startup ---
-try:
-    ensure_excel_file()
-    initialize_spreadsheet()
-    print("Backend initialized successfully")
-except Exception as e:
-    print(f"Error initializing backend: {e}")
-    # Initialize with empty data if Excel fails
-    initialize_spreadsheet()
+# Initialize default spreadsheet data (26 columns A-Z, 100 rows)
+def initialize_spreadsheet():
+    global spreadsheet_data
+    spreadsheet_data = {
+        "cells": {},
+        "columns": 26,  # A-Z
+        "rows": 100,
+        "metadata": {
+            "title": "Spreadsheet",
+            "created_at": datetime.now().isoformat(),
+            "last_modified": datetime.now().isoformat()
+        }
+    }
 
 def get_next_color():
     """Get the next available color, excluding blue colors for focus mode"""
@@ -311,22 +315,15 @@ def release_color(color):
     # Colors are now managed dynamically based on active users
     pass
 
-# Initialize default spreadsheet data (26 columns A-Z, 100 rows)
-def initialize_spreadsheet():
-    global spreadsheet_data
-    spreadsheet_data = {
-        "cells": {},
-        "columns": 26,  # A-Z
-        "rows": 100,
-        "metadata": {
-            "title": "Spreadsheet",
-            "created_at": datetime.now().isoformat(),
-            "last_modified": datetime.now().isoformat()
-        }
-    }
-
-# Initialize spreadsheet on startup
-initialize_spreadsheet()
+# --- On Startup ---
+try:
+    ensure_excel_file()
+    initialize_spreadsheet()
+    print("Backend initialized successfully")
+except Exception as e:
+    print(f"Error initializing backend: {e}")
+    # Initialize with empty data if Excel fails
+    initialize_spreadsheet()
 
 # Data persistence functions
 def ensure_data_directory():
