@@ -2,6 +2,23 @@
 
 A web-based spreadsheet application with real-time collaboration features, built with React frontend and FastAPI backend. This project demonstrates modern web development practices for building collaborative applications with real-time synchronization.
 
+## 🚀 Quick Deployment
+
+Want to deploy this project? Check out our comprehensive deployment guide:
+
+- **📖 [Full Deployment Guide](DEPLOYMENT.md)** - Step-by-step instructions
+- **⚡ [Quick Deploy Script](./deploy.sh)** - Automated deployment preparation
+
+### Quick Start (Deployment)
+```bash
+# Run the deployment preparation script
+./deploy.sh
+
+# Follow the prompts to deploy to:
+# - Backend: Railway (recommended)
+# - Frontend: Vercel (recommended)
+```
+
 ## 🚀 Setup Instructions
 
 ### Prerequisites
@@ -256,6 +273,10 @@ User Input → Client Validation → Server → Server Validation → Broadcast 
 - Limited formula support (SUM, AVERAGE, COUNT only)
 - No complex data types (images, links, etc.)
 - Basic date format support
+- **Formula Input Limitations**: 
+  - Cannot select ranges using mouse - ranges must be entered manually
+  - Formula autocomplete shows supported functions but clicking on them causes errors
+  - Range selection via mouse is not supported and will cause errors
 
 **Performance:**
 - No pagination for large datasets

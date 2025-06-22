@@ -5,9 +5,11 @@ import UserList from './components/UserList';
 import UserModal from './components/UserModal';
 import ResizablePanel from './components/ResizablePanel';
 import DataPersistence from './components/DataPersistence';
+import config from './config';
 import './App.css';
 
-const SOCKET_URL = 'http://localhost:8000';
+// Use configuration for backend URL
+const SOCKET_URL = config.wsUrl;
 
 function App() {
   const [socket, setSocket] = useState(null);
