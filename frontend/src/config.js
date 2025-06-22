@@ -5,8 +5,8 @@ const config = {
     wsUrl: 'ws://localhost:8000'
   },
   production: {
-    backendUrl: process.env.REACT_APP_BACKEND_URL || 'https://your-backend-url.railway.app',
-    wsUrl: process.env.REACT_APP_WS_URL || 'wss://your-backend-url.railway.app'
+    backendUrl: process.env.REACT_APP_BACKEND_URL || 'https://airtable-clone-backend.onrender.com',
+    wsUrl: process.env.REACT_APP_WS_URL || 'wss://airtable-clone-backend.onrender.com'
   }
 };
 
