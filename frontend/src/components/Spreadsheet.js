@@ -943,7 +943,7 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
   };
 
   return (
-    <div className="h-screen overflow-auto bg-white" style={{ scrollBehavior: 'smooth' }}>
+    <div className="h-full overflow-auto bg-white" style={{ scrollBehavior: 'smooth' }}>
       <div className="sticky top-0 bg-white z-10">
         <div className="flex border-b-2 border-gray-400 select-none">
           <div className="w-12 sm:w-16 bg-gray-100 border-r border-gray-300 flex-shrink-0 select-none"></div>

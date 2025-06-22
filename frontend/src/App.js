@@ -20,7 +20,6 @@ function App() {
   const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [showSidePanel, setShowSidePanel] = useState(true);
   const [userSelections, setUserSelections] = useState({});
-  const [showTooltip, setShowTooltip] = useState(false);
 
   useEffect(() => {
     const newSocket = io(SOCKET_URL);
@@ -171,65 +170,27 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row">
       <div className="flex-1 overflow-hidden relative">
-        <DataPersistence 
-          socket={socket}
-          spreadsheetData={spreadsheetData}
-          onDataLoad={handleDataLoad}
-          showSidePanel={showSidePanel}
-        />
-        <Spreadsheet 
-          socket={socket}
-          user={user}
-          data={spreadsheetData}
-          setData={setSpreadsheetData}
-          userSelections={userSelections}
-          setUserSelections={setUserSelections}
-        />
-        
-        {/* Toggle button for side panel - always visible */}
-        <div className="relative">
-          <button
-            onClick={() => setShowSidePanel(!showSidePanel)}
-            onMouseEnter={() => setShowTooltip(true)}
-            onMouseLeave={() => setShowTooltip(false)}
-            className="fixed top-4 right-4 z-50 bg-white border border-gray-300 rounded-full p-2 shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transform hover:scale-105"
-          >
-            {showSidePanel ? (
-              <svg className="w-5 h-5 text-gray-600 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5 text-gray-600 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            )}
-          </button>
-          
-          {/* Custom tooltip */}
-          {showTooltip && (
-            <div className="fixed top-12 right-4 z-50 bg-gray-900 text-white text-sm px-3 py-2 rounded-lg shadow-lg max-w-xs">
-              <div className="flex items-center space-x-2">
-                {showSidePanel ? (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    <span>Hide Users Panel</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                    <span>Show Users Panel ({activeUsers.filter(user => user.sid !== socket.id).length} online)</span>
-                  </>
-                )}
-              </div>
-              <div className="text-xs text-gray-300 mt-1">
-                {showSidePanel ? "Click to hide the users panel" : "Click to show who's currently editing"}
-              </div>
-            </div>
-          )}
+        {/* Root container with fixed height */}
+        <div className="h-screen flex flex-col pb-10">
+          <DataPersistence 
+            socket={socket}
+            spreadsheetData={spreadsheetData}
+            onDataLoad={handleDataLoad}
+            showSidePanel={showSidePanel}
+            onToggleSidePanel={() => setShowSidePanel(!showSidePanel)}
+            activeUsers={activeUsers}
+            userSelections={userSelections}
+          />
+          <div className="flex-1 overflow-hidden">
+            <Spreadsheet 
+              socket={socket}
+              user={user}
+              data={spreadsheetData}
+              setData={setSpreadsheetData}
+              userSelections={userSelections}
+              setUserSelections={setUserSelections}
+            />
+          </div>
         </div>
       </div>
       
@@ -255,6 +216,17 @@ function App() {
             />
           </ResizablePanel>
         )}
+      </div>
+      
+      {/* Footer */}
+      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-blue-50 to-indigo-50 border-t border-blue-200 py-1 px-4 z-40 shadow-lg">
+        <div className="flex items-center justify-center space-x-2 text-sm text-gray-700">
+          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+          </svg>
+          <span className="font-medium">Developed with ❤️ by</span>
+          <span className="font-bold text-blue-700 hover:text-blue-800 transition-colors cursor-pointer bg-white px-2 py-1 rounded-md shadow-sm border border-blue-200">Dipesh</span>
+        </div>
       </div>
     </div>
   );
