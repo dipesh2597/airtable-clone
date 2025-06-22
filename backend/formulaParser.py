@@ -194,5 +194,3 @@ def get_formula_error(formula: str, data: Dict[str, Any]) -> Optional[str]:
     range_obj = parse_cell_range(args[0])
     if not range_obj:
         return 'Invalid cell range'
-    
-    return None  # No error 

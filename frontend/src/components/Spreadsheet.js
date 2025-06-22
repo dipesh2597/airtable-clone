@@ -1027,7 +1027,7 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
               </div>
               {Array.from({ length: COLUMNS }, (_, colIndex) => {
                 const cellId = getCellId(rowIndex, colIndex);
-                const cellData = data.cells[cellId];
+                const cellData = data?.cells?.[cellId];
                 const isSelected = selectedCell === cellId;
                 const isInRange = selectedRange ? isCellInRange(cellId, selectedRange) : false;
                 const isEditing = editingCell === cellId;

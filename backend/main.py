@@ -3,11 +3,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import socketio
 import uvicorn
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import json
 import uuid
 from datetime import datetime
 import re
+import os
+from pathlib import Path
+from openpyxl import Workbook, load_workbook
+from openpyxl.utils import get_column_letter
+import pandas as pd
+from io import StringIO
 from validation import validate_value, detect_data_type
 
 # Initialize FastAPI app
@@ -36,6 +42,246 @@ spreadsheet_data: Dict[str, Any] = {}
 active_users: Dict[str, Dict] = {}
 user_sessions: Dict[str, str] = {}  # session_id -> user_id
 used_colors: set = set()
+
+# --- Excel Persistence Layer ---
+EXCEL_PATH = Path("data/spreadsheet.xlsx")
+
+# Ensure Excel file exists and load into memory
+
+def ensure_excel_file():
+    if not EXCEL_PATH.exists():
+        EXCEL_PATH.parent.mkdir(exist_ok=True)
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Sheet1"
+        # Pre-fill with empty values for 26 columns x 100 rows
+        for row in range(1, 101):
+            for col in range(1, 27):
+                ws.cell(row=row, column=col, value="")
+        wb.save(EXCEL_PATH)
+        print(f"Created new Excel file at {EXCEL_PATH}")
+
+
+def excel_to_spreadsheet_data():
+    wb = load_workbook(EXCEL_PATH)
+    ws = wb.active
+    cells = {}
+    max_row = max(ws.max_row, 100)
+    max_col = max(ws.max_column, 26)
+    for row in range(1, max_row + 1):
+        for col in range(1, max_col + 1):
+            cell = ws.cell(row=row, column=col)
+            cell_id = f"{get_column_letter(col)}{row}"
+            if cell.value not in (None, ""):
+                validation_result = validate_value(str(cell.value))
+                cells[cell_id] = {
+                    'value': validation_result['formatted_value'],
+                    'original_value': str(cell.value),
+                    'data_type': validation_result['detected_type'],
+                    'is_valid': validation_result['is_valid'],
+                    'validation_errors': validation_result['errors'],
+                    'last_modified_by': 'system',
+                    'last_modified_at': datetime.now().isoformat()
+                }
+    return {
+        "cells": cells,
+        "columns": max_col,
+        "rows": max_row,
+        "metadata": {
+            "title": "Spreadsheet",
+            "created_at": datetime.now().isoformat(),
+            "last_modified": datetime.now().isoformat(),
+            "filename": "spreadsheet.xlsx"
+        }
+    }
+
+
+def write_cell_to_excel(cell_id, value):
+    wb = load_workbook(EXCEL_PATH)
+    ws = wb.active
+    col_match = re.match(r'^([A-Z]+)', cell_id)
+    row_match = re.match(r'[A-Z]+(\d+)$', cell_id)
+    if col_match and row_match:
+        col_str = col_match.group(1)
+        row = int(row_match.group(1))
+        col = 0
+        for i, char in enumerate(reversed(col_str)):
+            col += (ord(char) - ord('A') + 1) * (26 ** i)
+        ws.cell(row=row, column=col, value=value)
+        wb.save(EXCEL_PATH)
+        print(f"Updated {cell_id} in Excel file.")
+        return True
+    return False
+
+# CSV Import/Export Functions
+def csv_to_spreadsheet_data(csv_content: str) -> Dict[str, Any]:
+    """Convert CSV content to spreadsheet data format"""
+    try:
+        # Read CSV content using pandas
+        df = pd.read_csv(StringIO(csv_content))
+        
+        min_rows = 100
+        min_cols = 26
+        max_row = max(len(df) + 1, min_rows)  # +1 for header row
+        max_col = max(len(df.columns), min_cols)
+        
+        cells = {}
+        # Add header row (column names)
+        for col_idx in range(1, max_col + 1):
+            if col_idx <= len(df.columns):
+                col_name = df.columns[col_idx - 1]
+            else:
+                col_name = ''
+            cell_id = f"{get_column_letter(col_idx)}1"
+            validation_result = validate_value(str(col_name))
+            cells[cell_id] = {
+                'value': validation_result['formatted_value'],
+                'original_value': str(col_name),
+                'data_type': validation_result['detected_type'],
+                'is_valid': validation_result['is_valid'],
+                'validation_errors': validation_result['errors'],
+                'last_modified_by': 'system',
+                'last_modified_at': datetime.now().isoformat()
+            }
+        # Add data rows
+        for row_idx in range(max_row - 1):
+            for col_idx in range(1, max_col + 1):
+                cell_id = f"{get_column_letter(col_idx)}{row_idx + 2}"
+                if row_idx < len(df) and col_idx <= len(df.columns):
+                    value = df.iloc[row_idx, col_idx - 1]
+                else:
+                    value = ''
+                if pd.notna(value) and value != '':
+                    validation_result = validate_value(str(value))
+                    cells[cell_id] = {
+                        'value': validation_result['formatted_value'],
+                        'original_value': str(value),
+                        'data_type': validation_result['detected_type'],
+                        'is_valid': validation_result['is_valid'],
+                        'validation_errors': validation_result['errors'],
+                        'last_modified_by': 'system',
+                        'last_modified_at': datetime.now().isoformat()
+                    }
+                else:
+                    cells[cell_id] = {
+                        'value': '',
+                        'original_value': '',
+                        'data_type': 'string',
+                        'is_valid': True,
+                        'validation_errors': [],
+                        'last_modified_by': 'system',
+                        'last_modified_at': datetime.now().isoformat()
+                    }
+        
+        result = {
+            "cells": cells,
+            "columns": max_col,
+            "rows": max_row,
+            "metadata": {
+                "title": "Spreadsheet",
+                "created_at": datetime.now().isoformat(),
+                "last_modified": datetime.now().isoformat(),
+                "filename": "spreadsheet.xlsx"
+            }
+        }
+        
+        print(f"CSV import result: {len(cells)} cells, {max_col} columns, {max_row} rows")
+        print(f"Sample cells: {list(cells.keys())[:10]}")
+        
+        return result
+    except Exception as e:
+        print(f"Error converting CSV to spreadsheet data: {e}")
+        raise e
+
+def spreadsheet_data_to_csv(data: Dict[str, Any]) -> str:
+    """Convert spreadsheet data to CSV format"""
+    try:
+        # Find the bounds of the data
+        if not data['cells']:
+            return ""
+        
+        # Get all cell coordinates
+        cell_coords = []
+        for cell_id in data['cells'].keys():
+            col_match = re.match(r'^([A-Z]+)', cell_id)
+            row_match = re.match(r'[A-Z]+(\d+)$', cell_id)
+            if col_match and row_match:
+                col_str = col_match.group(1)
+                row = int(row_match.group(1))
+                
+                # Convert column letter to number
+                col = 0
+                for i, char in enumerate(reversed(col_str)):
+                    col += (ord(char) - ord('A') + 1) * (26 ** i)
+                
+                cell_coords.append((row, col, cell_id))
+        
+        if not cell_coords:
+            return ""
+        
+        # Find bounds
+        max_row = max(coord[0] for coord in cell_coords)
+        max_col = max(coord[1] for coord in cell_coords)
+        
+        # Create a 2D array to hold the data
+        csv_data = []
+        for row in range(1, max_row + 1):
+            row_data = []
+            for col in range(1, max_col + 1):
+                cell_id = f"{get_column_letter(col)}{row}"
+                value = data['cells'].get(cell_id, {}).get('value', '')
+                row_data.append(str(value))
+            csv_data.append(row_data)
+        
+        # Convert to CSV string
+        csv_string = ""
+        for row in csv_data:
+            csv_string += ",".join(f'"{cell}"' if ',' in cell or '"' in cell else cell for cell in row) + "\n"
+        
+        return csv_string.rstrip('\n')
+    except Exception as e:
+        print(f"Error converting spreadsheet data to CSV: {e}")
+        raise e
+
+def import_csv_to_excel(csv_content: str):
+    """Import CSV data and update the Excel file"""
+    try:
+        # Convert CSV to spreadsheet data
+        new_data = csv_to_spreadsheet_data(csv_content)
+        
+        # Update the Excel file
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Sheet1"
+        
+        # Ensure we have a full 26x100 grid
+        for row in range(1, 101):  # 100 rows
+            for col in range(1, 27):  # 26 columns
+                cell_id = f"{get_column_letter(col)}{row}"
+                cell_data = new_data['cells'].get(cell_id)
+                if cell_data:
+                    ws.cell(row=row, column=col, value=cell_data['value'])
+                else:
+                    # Ensure empty cells are also written
+                    ws.cell(row=row, column=col, value="")
+        
+        # Save the workbook
+        wb.save(EXCEL_PATH)
+        print(f"Imported CSV data to Excel file: {EXCEL_PATH}")
+        
+        # Update global spreadsheet data
+        global spreadsheet_data
+        spreadsheet_data = new_data
+        
+        return {"success": True, "message": "CSV data imported successfully"}
+    except Exception as e:
+        print(f"Error importing CSV: {e}")
+        return {"success": False, "error": str(e)}
+
+# --- On Startup ---
+ensure_excel_file()
+spreadsheet_data = excel_to_spreadsheet_data()
+print(f"Spreadsheet data: {spreadsheet_data}")
 
 def get_next_color():
     """Get the next available color, excluding blue colors for focus mode"""
@@ -68,7 +314,7 @@ def initialize_spreadsheet():
         "columns": 26,  # A-Z
         "rows": 100,
         "metadata": {
-            "title": "Untitled Spreadsheet",
+            "title": "Spreadsheet",
             "created_at": datetime.now().isoformat(),
             "last_modified": datetime.now().isoformat()
         }
@@ -76,6 +322,94 @@ def initialize_spreadsheet():
 
 # Initialize spreadsheet on startup
 initialize_spreadsheet()
+
+# Data persistence functions
+def ensure_data_directory():
+    """Ensure the data directory exists"""
+    data_dir = Path("data")
+    data_dir.mkdir(exist_ok=True)
+    return data_dir
+
+def save_spreadsheet_to_file(filename: Optional[str] = None):
+    """Save current spreadsheet data to a JSON file"""
+    data_dir = ensure_data_directory()
+    
+    if not filename:
+        # Generate filename based on current timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"spreadsheet_{timestamp}.json"
+    
+    filepath = data_dir / filename
+    
+    # Update metadata before saving
+    spreadsheet_data['metadata']['last_modified'] = datetime.now().isoformat()
+    spreadsheet_data['metadata']['filename'] = filename
+    
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(spreadsheet_data, f, indent=2, ensure_ascii=False)
+        print(f"Spreadsheet saved to {filepath}")
+        return {"success": True, "filename": filename, "filepath": str(filepath)}
+    except Exception as e:
+        print(f"Error saving spreadsheet: {e}")
+        return {"success": False, "error": str(e)}
+
+def load_spreadsheet_from_file(filename: str):
+    """Load spreadsheet data from a JSON file"""
+    data_dir = ensure_data_directory()
+    filepath = data_dir / filename
+    
+    if not filepath.exists():
+        raise FileNotFoundError(f"Spreadsheet file not found: {filename}")
+    
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            global spreadsheet_data
+            spreadsheet_data = json.load(f)
+        print(f"Spreadsheet loaded from {filepath}")
+        return {"success": True, "filename": filename}
+    except Exception as e:
+        print(f"Error loading spreadsheet: {e}")
+        return {"success": False, "error": str(e)}
+
+def list_saved_spreadsheets():
+    """List all saved spreadsheet files"""
+    data_dir = ensure_data_directory()
+    spreadsheet_files = []
+    
+    for filepath in data_dir.glob("*.json"):
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                spreadsheet_files.append({
+                    "filename": filepath.name,
+                    "title": data.get("metadata", {}).get("title", "Untitled"),
+                    "created_at": data.get("metadata", {}).get("created_at", ""),
+                    "last_modified": data.get("metadata", {}).get("last_modified", ""),
+                    "size": filepath.stat().st_size
+                })
+        except Exception as e:
+            print(f"Error reading file {filepath}: {e}")
+    
+    # Sort by last modified date (newest first)
+    spreadsheet_files.sort(key=lambda x: x["last_modified"], reverse=True)
+    return spreadsheet_files
+
+def delete_spreadsheet_file(filename: str):
+    """Delete a saved spreadsheet file"""
+    data_dir = ensure_data_directory()
+    filepath = data_dir / filename
+    
+    if not filepath.exists():
+        raise FileNotFoundError(f"Spreadsheet file not found: {filename}")
+    
+    try:
+        filepath.unlink()
+        print(f"Spreadsheet deleted: {filepath}")
+        return {"success": True, "filename": filename}
+    except Exception as e:
+        print(f"Error deleting spreadsheet: {e}")
+        return {"success": False, "error": str(e)}
 
 # Socket.IO event handlers
 @sio.event
@@ -116,6 +450,8 @@ async def disconnect(sid):
 
 @sio.event
 async def join_spreadsheet(sid, data):
+    global spreadsheet_data
+    spreadsheet_data = excel_to_spreadsheet_data()
     user_id = data.get('user_id', str(uuid.uuid4()))
     user_name = data.get('user_name', f'User {user_id[:8]}')
     
@@ -155,38 +491,41 @@ async def join_spreadsheet(sid, data):
 
 @sio.event
 async def cell_update(sid, data):
-    """Handle cell value updates with validation"""
     cell_id = data.get('cell_id')
     value = data.get('value')
     user_id = user_sessions.get(sid)
     
-    if not cell_id or user_id not in active_users:
-        print(f"Invalid cell_update: cell_id={cell_id}, user_id={user_id}")
+    if not cell_id:
+        print(f"Invalid cell_update: missing cell_id from sid={sid}")
         return
-    
+        
+    if not user_id:
+        print(f"Invalid cell_update: user_id=None for sid={sid}, user_sessions={user_sessions}")
+        return
+        
+    if user_id not in active_users:
+        print(f"Invalid cell_update: user_id={user_id} not in active_users, active_users={list(active_users.keys())}")
+        return
+        
     user_name = active_users[user_id]['name']
     print(f"Cell update from {user_name} ({user_id}): {cell_id} = '{value}'")
-    
-    # Validate the value
     validation_result = validate_value(value)
-    
-    # Update spreadsheet data with validation info
     spreadsheet_data['cells'][cell_id] = {
         'value': validation_result['formatted_value'],
-        'original_value': value,  # Keep original input
+        'original_value': value,
         'data_type': validation_result['detected_type'],
         'is_valid': validation_result['is_valid'],
         'validation_errors': validation_result['errors'],
         'last_modified_by': user_id,
         'last_modified_at': datetime.now().isoformat()
     }
-    
+    spreadsheet_data['metadata']['last_modified'] = datetime.now().isoformat()
+    # Write to Excel file
+    write_cell_to_excel(cell_id, value)
     print(f"Validation result: type={validation_result['detected_type']}, valid={validation_result['is_valid']}")
     if not validation_result['is_valid']:
         print(f"Validation errors: {validation_result['errors']}")
-    
     print(f"Broadcasting cell_updated to all other users: {cell_id} = '{validation_result['formatted_value']}'")
-    # Broadcast update to all other users with validation info
     await sio.emit('cell_updated', {
         'cell_id': cell_id,
         'value': validation_result['formatted_value'],
@@ -203,8 +542,12 @@ async def cell_selection(sid, data):
     cell_id = data.get('cell_id')
     user_id = user_sessions.get(sid)
     
+    if not user_id:
+        print(f"Invalid cell_selection: user_id=None for sid={sid}, user_sessions={user_sessions}")
+        return
+    
     if user_id not in active_users:
-        print(f"Invalid cell_selection: user_id={user_id} not in active_users")
+        print(f"Invalid cell_selection: user_id={user_id} not in active_users, active_users={list(active_users.keys())}")
         return
     
     user_name = active_users[user_id]['name']
@@ -439,6 +782,9 @@ async def sort_operation(sid, data):
             
             rows_with_data.append(row_data)
     
+    if not rows_with_data:
+        return
+    
     # Sort the rows
     def sort_key(row):
         value = row['sort_value'].strip()
@@ -486,6 +832,73 @@ async def sort_operation(sid, data):
         'cells': new_cells
     })
 
+@sio.event
+async def save_spreadsheet_request(sid, data):
+    """Handle save spreadsheet request from client"""
+    user_id = user_sessions.get(sid)
+    if user_id not in active_users:
+        return
+    
+    filename = data.get('filename')
+    result = save_spreadsheet_to_file(filename)
+    
+    if result['success']:
+        # Notify all clients about the save
+        await sio.emit('spreadsheet_saved', {
+            'filename': result['filename'],
+            'user_id': user_id,
+            'user_name': active_users[user_id]['name']
+        })
+    
+    # Send result back to the requesting client
+    await sio.emit('save_result', result, room=sid)
+
+@sio.event
+async def load_spreadsheet_request(sid, data):
+    """Handle load spreadsheet request from client"""
+    user_id = user_sessions.get(sid)
+    if user_id not in active_users:
+        return
+    
+    filename = data.get('filename')
+    if not filename:
+        await sio.emit('load_result', {'success': False, 'error': 'Filename is required'}, room=sid)
+        return
+    
+    try:
+        result = load_spreadsheet_from_file(filename)
+        if result['success']:
+            # Broadcast the loaded data to all clients
+            await sio.emit('spreadsheet_loaded', {
+                'data': spreadsheet_data,
+                'filename': filename,
+                'user_id': user_id,
+                'user_name': active_users[user_id]['name']
+            })
+        
+        # Send result back to the requesting client
+        await sio.emit('load_result', result, room=sid)
+    except Exception as e:
+        await sio.emit('load_result', {'success': False, 'error': str(e)}, room=sid)
+
+@sio.event
+async def update_title_request(sid, data):
+    """Handle spreadsheet title update request"""
+    user_id = user_sessions.get(sid)
+    if user_id not in active_users:
+        return
+    
+    title = data.get('title', 'Spreadsheet')
+    spreadsheet_data['metadata']['title'] = title
+    spreadsheet_data['metadata']['last_modified'] = datetime.now().isoformat()
+    
+    # Broadcast title update to all clients
+    await sio.emit('title_updated', {
+        'title': title,
+        'user_id': user_id,
+        'user_name': active_users[user_id]['name']
+    })
+
 # HTTP endpoints
 @app.get("/")
 async def root():
@@ -506,8 +919,99 @@ async def get_active_users():
 async def reset_spreadsheet():
     """Reset spreadsheet to initial state"""
     initialize_spreadsheet()
-    await sio.emit('spreadsheet_reset', spreadsheet_data)
-    return {"message": "Spreadsheet reset successfully"} 
+    return {"message": "Spreadsheet reset successfully"}
+
+# Data persistence API endpoints
+@app.post("/api/spreadsheet/save")
+async def save_spreadsheet(data: Dict[str, Any]):
+    """Save current spreadsheet data"""
+    filename = data.get("filename")
+    result = save_spreadsheet_to_file(filename)
+    return result
+
+@app.post("/api/spreadsheet/load")
+async def load_spreadsheet(data: Dict[str, Any]):
+    """Load spreadsheet data from file"""
+    filename = data.get("filename")
+    if not filename:
+        raise HTTPException(status_code=400, detail="Filename is required")
+    
+    try:
+        result = load_spreadsheet_from_file(filename)
+        return result
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/spreadsheet/list")
+async def list_spreadsheets():
+    """List all saved spreadsheets"""
+    try:
+        files = list_saved_spreadsheets()
+        return {"files": files}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/spreadsheet/delete/{filename}")
+async def delete_spreadsheet(filename: str):
+    """Delete a saved spreadsheet"""
+    try:
+        result = delete_spreadsheet_file(filename)
+        return result
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/spreadsheet/update-title")
+async def update_spreadsheet_title(data: Dict[str, Any]):
+    """Update spreadsheet title"""
+    title = data.get("title", "Spreadsheet")
+    spreadsheet_data['metadata']['title'] = title
+    spreadsheet_data['metadata']['last_modified'] = datetime.now().isoformat()
+    return {"success": True, "title": title}
+
+# CSV Import/Export API endpoints
+@app.post("/api/spreadsheet/import-csv")
+async def import_csv(data: Dict[str, Any]):
+    """Import CSV data into the spreadsheet"""
+    csv_content = data.get("csv_content")
+    if not csv_content:
+        raise HTTPException(status_code=400, detail="CSV content is required")
+    
+    try:
+        result = import_csv_to_excel(csv_content)
+        if result['success']:
+            # Ensure the global spreadsheet_data is updated
+            global spreadsheet_data
+            spreadsheet_data = excel_to_spreadsheet_data()
+            
+            print(f"Broadcasting updated spreadsheet data: {len(spreadsheet_data.get('cells', {}))} cells")
+            
+            # Broadcast the updated data to all connected clients
+            await sio.emit('spreadsheet_loaded', {
+                'data': spreadsheet_data,
+                'filename': 'spreadsheet.xlsx',
+                'user_id': 'system',
+                'user_name': 'System'
+            })
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/spreadsheet/export-csv")
+async def export_csv():
+    """Export spreadsheet data as CSV"""
+    try:
+        csv_content = spreadsheet_data_to_csv(spreadsheet_data)
+        return {
+            "success": True,
+            "csv_content": csv_content,
+            "filename": "spreadsheet.csv"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     uvicorn.run("main:socket_app", host="0.0.0.0", port=8000, reload=True)

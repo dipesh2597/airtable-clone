@@ -4,6 +4,7 @@ import Spreadsheet from './components/Spreadsheet';
 import UserList from './components/UserList';
 import UserModal from './components/UserModal';
 import ResizablePanel from './components/ResizablePanel';
+import DataPersistence from './components/DataPersistence';
 import './App.css';
 
 const SOCKET_URL = 'http://localhost:8000';
@@ -38,6 +39,13 @@ function App() {
 
     newSocket.on('spreadsheet_data', (data) => {
       setSpreadsheetData(data);
+    });
+
+    newSocket.on('spreadsheet_loaded', (data) => {
+      console.log('Received spreadsheet_loaded event:', data);
+      const newData = data.data || data;
+      console.log('Setting spreadsheet data to:', newData);
+      setSpreadsheetData(newData);
     });
 
     newSocket.on('active_users', (users) => {
@@ -105,11 +113,18 @@ function App() {
   const handleUserSubmit = (userData) => {
     const userId = `user_${Math.random().toString(36).substr(2, 9)}`;
     
-    setUser({ 
+    const user = { 
       id: userId, 
       name: userData.name
-    });
+    };
     
+    // Store user data in localStorage for session recovery
+    localStorage.setItem('userData', JSON.stringify({
+      user_id: userId,
+      user_name: userData.name
+    }));
+    
+    setUser(user);
     setShowUserModal(false);
 
     if (socket) {
@@ -132,6 +147,10 @@ function App() {
     }
   };
 
+  const handleDataLoad = (newData) => {
+    setSpreadsheetData(newData);
+  };
+
   if (showUserModal) {
     return <UserModal onSubmit={handleUserSubmit} />;
   }
@@ -150,6 +169,11 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row">
       <div className="flex-1 overflow-hidden relative">
+        <DataPersistence 
+          socket={socket}
+          spreadsheetData={spreadsheetData}
+          onDataLoad={handleDataLoad}
+        />
         <Spreadsheet 
           socket={socket}
           user={user}
