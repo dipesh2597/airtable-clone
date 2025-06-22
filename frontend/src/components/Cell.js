@@ -11,7 +11,7 @@ function Cell({
   onEdit, 
   editValue, 
   setEditValue,
-  onTabNavigation
+  onTabEdit
 }) {
   const inputRef = useRef(null);
 
@@ -25,7 +25,9 @@ function Cell({
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
+      e.stopPropagation();
       onEdit(editValue);
+      // Exit edit mode - parent will handle navigation
     } else if (e.key === 'Escape') {
       e.preventDefault();
       setEditValue(value);
@@ -33,8 +35,7 @@ function Cell({
     } else if (e.key === 'Tab') {
       e.preventDefault();
       e.stopPropagation();
-      const direction = e.shiftKey ? 'prev' : 'next';
-      onTabNavigation(direction);
+      onTabEdit(editValue); // Save current value and navigate right
     }
   };
 
@@ -51,7 +52,7 @@ function Cell({
     <div
       className={`
         relative w-16 sm:w-20 lg:w-24 h-8 border-r border-b border-gray-300 
-        ${isSelected ? 'bg-blue-100 border-blue-500' : 'bg-white hover:bg-gray-50'}
+        ${isSelected ? 'ring-2 ring-blue-500 ring-inset bg-blue-50' : 'bg-white hover:bg-gray-50'}
         cursor-pointer touch-manipulation
       `}
       onClick={onClick}

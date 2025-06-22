@@ -36,22 +36,28 @@ active_users: Dict[str, Dict] = {}
 user_sessions: Dict[str, str] = {}  # session_id -> user_id
 used_colors: set = set()
 
-available_colors = [
-    '#3B82F6', '#EF4444', '#10B981', '#F59E0B', 
-    '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16',
-    '#F97316', '#6366F1', '#14B8A6', '#F43F5E',
-    '#8B5A2B', '#4F46E5', '#059669', '#DC2626'
-]
-
-def get_available_color():
-    for color in available_colors:
-        if color not in used_colors:
-            return color
-    return f'#{format(hash(str(uuid.uuid4())) % 0xFFFFFF, "06x")}'
+def get_next_color():
+    """Get the next available color, excluding blue colors for focus mode"""
+    colors = [
+        '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+        '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+        '#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#D7BDE2',
+        '#F9E79F', '#ABEBC6', '#FAD7A0', '#D5A6BD', '#A9CCE3'
+    ]
+    
+    used_colors_set = {user['color'] for user in active_users.values()}
+    available_colors = [color for color in colors if color not in used_colors_set]
+    
+    if not available_colors:
+        # If all colors are used, start over
+        return colors[0]
+    
+    return available_colors[0]
 
 def release_color(color):
-    if color in used_colors:
-        used_colors.remove(color)
+    """Release a color back to the pool (no longer needed with new system)"""
+    # Colors are now managed dynamically based on active users
+    pass
 
 # Initialize default spreadsheet data (26 columns A-Z, 100 rows)
 def initialize_spreadsheet():
@@ -123,8 +129,7 @@ async def join_spreadsheet(sid, data):
             del user_sessions[existing_sid]
             await sio.emit('user_left', {'user_id': existing_sid})  # Send sid instead of user_id
     
-    user_color = get_available_color()
-    used_colors.add(user_color)
+    user_color = get_next_color()
     
     user_sessions[sid] = user_id
     
