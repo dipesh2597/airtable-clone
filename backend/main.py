@@ -7,6 +7,7 @@ from typing import Dict, List, Any
 import json
 import uuid
 from datetime import datetime
+import re
 
 # Initialize FastAPI app
 app = FastAPI(title="Airtable Clone API", version="1.0.0")
@@ -72,39 +73,61 @@ initialize_spreadsheet()
 # Socket.IO event handlers
 @sio.event
 async def connect(sid, environ):
-    """Handle client connection"""
-    print(f"Client connected: {sid}")
+    """Handle user connection"""
+    print(f"User connected: {sid}")
     await sio.emit('user_connected', {'sid': sid}, room=sid)
 
 @sio.event
 async def disconnect(sid):
-    """Handle client disconnection"""
-    print(f"Client disconnected: {sid}")
+    """Handle user disconnection"""
+    print(f"User disconnected: {sid}")
     
     if sid in user_sessions:
         user_id = user_sessions[sid]
         if user_id in active_users:
             user_color = active_users[user_id]['color']
+            user_name = active_users[user_id]['name']
             release_color(user_color)
-            print(f"User {active_users[user_id]['name']} left, released color {user_color}")
+            print(f"User {user_name} left, released color {user_color}")
+            
+            # Send the complete user object for proper frontend handling
+            user_data = {
+                'user_id': sid,  # Send sid instead of user_id for proper frontend matching
+                'name': user_name,
+                'color': user_color
+            }
+            
+            print(f"DEBUG: Sending user_left event with user_id={sid} (sid), user_id_internal={user_id}")
+            
             del active_users[user_id]
         del user_sessions[sid]
         
-        await sio.emit('user_left', {'user_id': user_id}, skip_sid=sid)
+        # Broadcast user left to all remaining users
+        await sio.emit('user_left', user_data)
+        await sio.emit('user_selection_cleared', {'user_id': sid})  # Send sid instead of user_id
+        print(f"Broadcasted user_left for {user_id}")
 
 @sio.event
 async def join_spreadsheet(sid, data):
-    """Handle user joining the spreadsheet"""
     user_id = data.get('user_id', str(uuid.uuid4()))
     user_name = data.get('user_name', f'User {user_id[:8]}')
+    
+    # Check if this user_id already exists and remove old session
+    for existing_sid, existing_user_id in user_sessions.items():
+        if existing_user_id == user_id and existing_sid != sid:
+            print(f"Removing duplicate user session: {existing_user_id}")
+            if existing_user_id in active_users:
+                old_color = active_users[existing_user_id]['color']
+                release_color(old_color)
+                del active_users[existing_user_id]
+            del user_sessions[existing_sid]
+            await sio.emit('user_left', {'user_id': existing_sid})  # Send sid instead of user_id
     
     user_color = get_available_color()
     used_colors.add(user_color)
     
-    # Store user session
     user_sessions[sid] = user_id
     
-    # Add to active users
     active_users[user_id] = {
         'name': user_name,
         'color': user_color,
@@ -112,15 +135,13 @@ async def join_spreadsheet(sid, data):
         'current_cell': None
     }
     
-    # Send current spreadsheet data to the new user
-    await sio.emit('spreadsheet_data', spreadsheet_data, room=sid)
+    print(f"User {user_name} joined with color {user_color}")
     
-    # Send active users list to the new user
+    await sio.emit('spreadsheet_data', spreadsheet_data, room=sid)
     await sio.emit('active_users', list(active_users.values()), room=sid)
     
-    # Broadcast new user joined to others
     await sio.emit('user_joined', {
-        'user_id': user_id,
+        'user_id': sid,  # Send sid instead of user_id for consistency
         'name': user_name,
         'color': user_color
     }, skip_sid=sid)
@@ -133,7 +154,11 @@ async def cell_update(sid, data):
     user_id = user_sessions.get(sid)
     
     if not cell_id or user_id not in active_users:
+        print(f"Invalid cell_update: cell_id={cell_id}, user_id={user_id}")
         return
+    
+    user_name = active_users[user_id]['name']
+    print(f"Cell update from {user_name} ({user_id}): {cell_id} = '{value}'")
     
     # Update spreadsheet data
     spreadsheet_data['cells'][cell_id] = {
@@ -142,6 +167,7 @@ async def cell_update(sid, data):
         'last_modified_at': datetime.now().isoformat()
     }
     
+    print(f"Broadcasting cell_updated to all other users: {cell_id} = '{value}'")
     # Broadcast update to all other users
     await sio.emit('cell_updated', {
         'cell_id': cell_id,
@@ -156,17 +182,42 @@ async def cell_selection(sid, data):
     user_id = user_sessions.get(sid)
     
     if user_id not in active_users:
+        print(f"Invalid cell_selection: user_id={user_id} not in active_users")
         return
+    
+    user_name = active_users[user_id]['name']
+    print(f"Cell selection from {user_name} ({user_id}): {cell_id}")
+    
+    # Parse cell coordinates from cell_id (e.g., "A1" -> row=0, col=0)
+    col = 0
+    row = 0
+    if cell_id:
+        col_match = re.match(r'^([A-Z]+)', cell_id)
+        row_match = re.match(r'[A-Z]+(\d+)$', cell_id)
+        if col_match and row_match:
+            col_str = col_match.group(1)
+            col = sum((ord(c) - ord('A') + 1) * (26 ** i) for i, c in enumerate(reversed(col_str))) - 1
+            row = int(row_match.group(1)) - 1
     
     # Update user's current cell
     active_users[user_id]['current_cell'] = cell_id
     
+    print(f"Broadcasting cell_selected to other users: {user_name} selected {cell_id}")
     # Broadcast selection to other users
     await sio.emit('cell_selected', {
         'cell_id': cell_id,
         'user_id': user_id,
         'user_name': active_users[user_id]['name'],
         'user_color': active_users[user_id]['color']
+    }, skip_sid=sid)
+    
+    # Also emit user_selection event for user list updates
+    await sio.emit('user_selection', {
+        'user_id': user_id,
+        'cell': {
+            'row': row,
+            'col': col
+        }
     }, skip_sid=sid)
 
 # HTTP endpoints
