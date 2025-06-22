@@ -75,7 +75,12 @@ function App() {
     newSocket.on('user_selection_cleared', (data) => {
       setUserSelections(prev => {
         const newSelections = { ...prev };
-        delete newSelections[data.user_id];
+        // Clear all selections for this user by iterating through all cells
+        Object.keys(newSelections).forEach(cellId => {
+          if (newSelections[cellId].user_id === data.user_id) {
+            delete newSelections[cellId];
+          }
+        });
         return newSelections;
       });
     });

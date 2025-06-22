@@ -346,11 +346,14 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
     };
 
         const handleCellEdit = (cellId, value) => {
+    // Detect if this is a formula
+    const isFormulaValue = typeof value === 'string' && value.startsWith('=');
+    
     // Create proper cell data structure
     const cellData = {
       value: value,
       original_value: value,
-      data_type: 'text', // Will be updated by server validation
+      data_type: isFormulaValue ? 'formula' : 'text', // Detect formula type
       is_valid: true,
       validation_errors: [],
       last_modified_by: user.id,
@@ -1035,6 +1038,7 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
                     key={cellId}
                     cellId={cellId}
                     value={cellData?.value || ''}
+                    data={data}
                     isSelected={isSelected}
                     isInRange={isInRange}
                     isEditing={isEditing}

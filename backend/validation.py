@@ -6,6 +6,7 @@ Mirrors the frontend validation logic to ensure consistency
 import re
 from datetime import datetime
 from typing import Dict, Any, List, Union
+from formulaParser import is_formula, get_formula_display_value, get_formula_error
 
 
 def is_valid_date(date_string: str) -> bool:
@@ -85,6 +86,10 @@ def detect_data_type(value: Union[str, int, float, None]) -> str:
     
     string_value = str(value).strip()
     
+    # Check for formula first
+    if is_formula(string_value):
+        return 'formula'
+    
     # Check for number first (most specific)
     if is_valid_number(string_value):
         return 'number'
@@ -149,6 +154,12 @@ def validate_value(value: Union[str, int, float, None], expected_type: str = Non
             result['errors'].append('Text too long (max 1000 characters)')
         result['formatted_value'] = string_value
     
+    elif type_to_validate == 'formula':
+        # Formula validation - for now, just mark as valid and keep original
+        # Server-side formula evaluation would require access to full data
+        result['is_valid'] = True
+        result['formatted_value'] = string_value
+    
     elif type_to_validate == 'empty':
         result['formatted_value'] = ''
     
@@ -163,6 +174,7 @@ def get_type_icon(data_type: str) -> str:
     icons = {
         'number': '123',
         'date': '📅',
+        'formula': '∑',
         'text': 'T',
         'empty': ''
     }

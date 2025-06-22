@@ -1,4 +1,5 @@
 // Data type detection and validation utilities
+import { isFormula, getFormulaDisplayValue, getFormulaError } from './formulaParser.js';
 
 // Helper function to check if a string is a valid date
 export const isValidDate = (dateString) => {
@@ -56,6 +57,11 @@ export const detectDataType = (value) => {
   
   const stringValue = String(value).trim();
   
+  // Check for formula first
+  if (isFormula(stringValue)) {
+    return 'formula';
+  }
+  
   // Check for number first (most specific)
   if (isValidNumber(stringValue)) {
     return 'number';
@@ -71,7 +77,7 @@ export const detectDataType = (value) => {
 };
 
 // Validate value based on detected or specified type
-export const validateValue = (value, expectedType = null) => {
+export const validateValue = (value, expectedType = null, data = null) => {
   const detectedType = detectDataType(value);
   const typeToValidate = expectedType || detectedType;
   
@@ -123,6 +129,19 @@ export const validateValue = (value, expectedType = null) => {
       result.formattedValue = stringValue;
       break;
       
+    case 'formula':
+      // Formula validation
+      const formulaError = getFormulaError(stringValue, data);
+      if (formulaError) {
+        result.isValid = false;
+        result.errors.push(formulaError);
+        result.formattedValue = '#ERROR!';
+      } else {
+        result.isValid = true;
+        result.formattedValue = getFormulaDisplayValue(stringValue, data);
+      }
+      break;
+      
     case 'empty':
       result.formattedValue = '';
       break;
@@ -141,6 +160,8 @@ export const getTypeIcon = (type) => {
       return '123';
     case 'date':
       return '📅';
+    case 'formula':
+      return '∑';
     case 'text':
       return 'T';
     case 'empty':

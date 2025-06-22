@@ -111,7 +111,7 @@ async def disconnect(sid):
         
         # Broadcast user left to all remaining users
         await sio.emit('user_left', user_data)
-        await sio.emit('user_selection_cleared', {'user_id': sid})  # Send sid instead of user_id
+        await sio.emit('user_selection_cleared', {'user_id': user_id})  # Send actual user_id, not sid
         print(f"Broadcasted user_left for {user_id}")
 
 @sio.event
@@ -129,6 +129,7 @@ async def join_spreadsheet(sid, data):
                 del active_users[existing_user_id]
             del user_sessions[existing_sid]
             await sio.emit('user_left', {'user_id': existing_sid})  # Send sid instead of user_id
+            await sio.emit('user_selection_cleared', {'user_id': existing_user_id})  # Send actual user_id
     
     user_color = get_next_color()
     
@@ -507,3 +508,6 @@ async def reset_spreadsheet():
     initialize_spreadsheet()
     await sio.emit('spreadsheet_reset', spreadsheet_data)
     return {"message": "Spreadsheet reset successfully"} 
+
+if __name__ == "__main__":
+    uvicorn.run("main:socket_app", host="0.0.0.0", port=8000, reload=True)
