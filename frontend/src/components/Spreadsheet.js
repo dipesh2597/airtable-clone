@@ -12,6 +12,7 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
   const [editingCell, setEditingCell] = useState(null);
   const [clipboard, setClipboard] = useState(null); // { data: [], type: 'copy' | 'cut' }
   const [contextMenu, setContextMenu] = useState({ isVisible: false, position: { x: 0, y: 0 }, type: null, index: null });
+  const [sortConfig, setSortConfig] = useState({ column: null, direction: null }); // null, 'asc', 'desc'
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
     height: window.innerHeight
@@ -85,12 +86,21 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
       setContextMenu({ isVisible: false, position: { x: 0, y: 0 }, type: null, index: null });
     });
 
+    socket.on('sort_applied', ({ column, direction, user_id, cells }) => {
+      setData(prev => ({
+        ...prev,
+        cells: cells
+      }));
+      setSortConfig({ column, direction });
+    });
+
     return () => {
         if (socket) {
             socket.off('cell_updated');
             socket.off('cell_selected');
             socket.off('row_operation_applied');
             socket.off('column_operation_applied');
+            socket.off('sort_applied');
         }
     };
   }, [socket, setData, setUserSelections]);
@@ -197,7 +207,15 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
       const rangeData = getCellRange(selectedRange.start, selectedRange.end);
       const updates = {};
       rangeData.flat().forEach(cellId => {
-        updates[cellId] = '';
+        updates[cellId] = {
+          value: '',
+          original_value: '',
+          data_type: 'empty',
+          is_valid: true,
+          validation_errors: [],
+          last_modified_by: user.id,
+          last_modified_at: new Date().toISOString()
+        };
       });
       
       setData(prev => ({
@@ -206,8 +224,8 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
       }));
       
       // Emit updates to server
-      Object.entries(updates).forEach(([cellId, value]) => {
-        socket.emit('cell_update', { cell_id: cellId, value });
+      Object.entries(updates).forEach(([cellId, cellObj]) => {
+        socket.emit('cell_update', { cell_id: cellId, value: cellObj.value });
       });
       
 
@@ -219,7 +237,18 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
       // Clear the cell
       setData(prev => ({
         ...prev,
-        cells: { ...prev.cells, [selectedCell]: '' }
+        cells: { 
+          ...prev.cells, 
+          [selectedCell]: {
+            value: '',
+            original_value: '',
+            data_type: 'empty',
+            is_valid: true,
+            validation_errors: [],
+            last_modified_by: user.id,
+            last_modified_at: new Date().toISOString()
+          }
+        }
       }));
       
       socket.emit('cell_update', { cell_id: selectedCell, value: '' });
@@ -244,7 +273,15 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
         
         if (cellRow < ROWS && cellCol < COLUMNS) {
           const cellId = getCellId(cellRow, cellCol);
-          updates[cellId] = value;
+          updates[cellId] = {
+            value: value,
+            original_value: value,
+            data_type: 'text', // Will be updated by server validation
+            is_valid: true,
+            validation_errors: [],
+            last_modified_by: user.id,
+            last_modified_at: new Date().toISOString()
+          };
         }
       });
     });
@@ -255,8 +292,8 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
     }));
     
     // Emit updates to server
-    Object.entries(updates).forEach(([cellId, value]) => {
-      socket.emit('cell_update', { cell_id: cellId, value });
+    Object.entries(updates).forEach(([cellId, cellObj]) => {
+      socket.emit('cell_update', { cell_id: cellId, value: cellObj.value });
     });
     
 
@@ -308,35 +345,56 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
       editingCellRef.current = cellId; // Update ref immediately
     };
 
-      const handleCellEdit = (cellId, value) => {
-      setData(prev => ({
-        ...prev,
-        cells: { ...prev.cells, [cellId]: value }
-      }));
-
-      // Update the ref immediately to prevent stale data
-      dataRef.current = {
-        ...dataRef.current,
-        cells: { ...dataRef.current.cells, [cellId]: value }
-      };
-
-      socket.emit('cell_update', { cell_id: cellId, value });
-      setEditingCell(null);
-      editingCellRef.current = null; // Update ref immediately
+        const handleCellEdit = (cellId, value) => {
+    // Create proper cell data structure
+    const cellData = {
+      value: value,
+      original_value: value,
+      data_type: 'text', // Will be updated by server validation
+      is_valid: true,
+      validation_errors: [],
+      last_modified_by: user.id,
+      last_modified_at: new Date().toISOString()
     };
 
-      const handleCellEditAndNavigate = (cellId, value) => {
-      handleCellEdit(cellId, value);
-      // Navigate to cell below after editing (for Enter key)
-      setTimeout(() => navigateToCellBelow(cellId), 5);
+    setData(prev => ({
+      ...prev,
+      cells: { ...prev.cells, [cellId]: cellData }
+    }));
+
+    // Update the ref immediately to prevent stale data
+    dataRef.current = {
+      ...dataRef.current,
+      cells: { ...dataRef.current.cells, [cellId]: cellData }
     };
 
-      const handleCellEditAndNavigateRight = (cellId, value) => {
-      // Handle the cell edit first, then navigate right
-      handleCellEdit(cellId, value);
-      // Navigate to the right after editing (for Tab key)
-      setTimeout(() => navigateToCellRight(cellId), 5);
-    };
+    socket.emit('cell_update', { cell_id: cellId, value });
+    setEditingCell(null);
+    editingCellRef.current = null; // Update ref immediately
+  };
+
+        const handleCellEditAndNavigate = (cellId, value) => {
+    handleCellEdit(cellId, value);
+    // Navigate to cell below after editing (for Enter key)
+    setTimeout(() => {
+      navigateToCellBelow(cellId);
+      if (gridRef.current) {
+        gridRef.current.focus({ preventScroll: true });
+      }
+    }, 5);
+  };
+
+  const handleCellEditAndNavigateRight = (cellId, value) => {
+    // Handle the cell edit first, then navigate right
+    handleCellEdit(cellId, value);
+    // Navigate to the right after editing (for Tab key)
+    setTimeout(() => {
+      navigateToCellRight(cellId);
+      if (gridRef.current) {
+        gridRef.current.focus({ preventScroll: true });
+      }
+    }, 5);
+  };
 
   const ensureGridFocus = () => {
     if (gridRef.current && document.activeElement !== gridRef.current) {
@@ -375,8 +433,7 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
       const newCellId = getCellId(row + 1, col);
       setSelectedCell(newCellId);
       selectedCellRef.current = newCellId;
-      
-      // Don't call ensureGridFocus here to prevent scroll issues
+      socket.emit('cell_selection', { cell_id: newCellId });
     }
   };
 
@@ -386,8 +443,7 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
       const newCellId = getCellId(row, col + 1);
       setSelectedCell(newCellId);
       selectedCellRef.current = newCellId;
-      
-      // Don't call ensureGridFocus here to prevent scroll issues
+      socket.emit('cell_selection', { cell_id: newCellId });
     }
   };
 
@@ -503,6 +559,10 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
           rangeData.flat().forEach(cellId => {
             updates[cellId] = {
               value: '',
+              original_value: '',
+              data_type: 'empty',
+              is_valid: true,
+              validation_errors: [],
               last_modified_by: user.id,
               last_modified_at: new Date().toISOString()
             };
@@ -568,6 +628,10 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
               const cellId = getCellId(targetRow, targetCol);
               updates[cellId] = {
                 value: value,
+                original_value: value,
+                data_type: 'text', // Will be updated by server validation
+                is_valid: true,
+                validation_errors: [],
                 last_modified_by: user.id,
                 last_modified_at: new Date().toISOString()
               };
@@ -589,6 +653,10 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
             ...prev.cells,
             [selectedCell]: {
               value: pastedText,
+              original_value: pastedText,
+              data_type: 'text', // Will be updated by server validation
+              is_valid: true,
+              validation_errors: [],
               last_modified_by: user.id,
               last_modified_at: new Date().toISOString()
             }
@@ -600,13 +668,13 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
     // Do not focus grid here - let navigation handle focus management
   };
 
-  useEffect(() => {
-          const handleGlobalKeyDown = (e) => {
-        if (editingCellRef.current) {
-          return;
-        }
-      
-      if (document.activeElement === gridRef.current) {
+    useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (editingCellRef.current) {
+        return;
+      }
+    
+      if (document.activeElement === gridRef.current || !document.activeElement || document.activeElement === document.body) {
         handleKeyDown(e);
       }
     };
@@ -840,6 +908,37 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
     setContextMenu({ isVisible: false, position: { x: 0, y: 0 }, type: null, index: null });
   };
 
+  // Sorting functions
+  const handleColumnSort = (colIndex) => {
+    let newDirection = 'asc';
+    
+    if (sortConfig.column === colIndex) {
+      if (sortConfig.direction === 'asc') {
+        newDirection = 'desc';
+      } else if (sortConfig.direction === 'desc') {
+        newDirection = null; // Clear sort
+      }
+    }
+    
+    if (newDirection === null) {
+      setSortConfig({ column: null, direction: null });
+      // Emit clear sort to server
+      socket.emit('sort_operation', {
+        column: null,
+        direction: null,
+        user_id: user.id
+      });
+    } else {
+      setSortConfig({ column: colIndex, direction: newDirection });
+      // Emit sort operation to server
+      socket.emit('sort_operation', {
+        column: colIndex,
+        direction: newDirection,
+        user_id: user.id
+      });
+    }
+  };
+
   return (
     <div className="h-screen overflow-auto bg-white" style={{ scrollBehavior: 'smooth' }}>
       <div className="sticky top-0 bg-white z-10">
@@ -862,16 +961,27 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
                 colIsHighlighted = true;
               }
             }
+            const isSorted = sortConfig.column === colIndex;
+            const sortDirection = isSorted ? sortConfig.direction : null;
+            
             return (
               <div
                 key={colIndex}
                 className={`w-16 sm:w-20 lg:w-24 h-8 flex items-center justify-center border-r border-gray-300 text-xs sm:text-sm font-medium text-gray-700 flex-shrink-0 select-none cursor-pointer hover:bg-gray-200
-                  ${colIsHighlighted ? 'bg-blue-100' : 'bg-gray-100'}
+                  ${colIsHighlighted ? 'bg-blue-100' : isSorted ? 'bg-blue-50' : 'bg-gray-100'}
                 `}
+                onClick={() => handleColumnSort(colIndex)}
                 onContextMenu={(e) => handleColumnRightClick(e, colIndex)}
-                title={`Right-click for column options`}
+                title={`Click to sort ${sortDirection === 'asc' ? 'descending' : sortDirection === 'desc' ? 'clear sort' : 'ascending'} | Right-click for column options`}
               >
-                {getColumnLabel(colIndex)}
+                <span className="flex items-center space-x-1">
+                  <span>{getColumnLabel(colIndex)}</span>
+                  {isSorted && (
+                    <span className="text-blue-600">
+                      {sortDirection === 'asc' ? '↑' : '↓'}
+                    </span>
+                  )}
+                </span>
               </div>
             );
           })}
@@ -951,6 +1061,7 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
         position={contextMenu.position}
         type={contextMenu.type}
         index={contextMenu.index}
+        sortConfig={sortConfig}
         onClose={closeContextMenu}
         onInsertBefore={(index) => {
           if (contextMenu.type === 'row') {
@@ -972,6 +1083,15 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
           } else {
             deleteColumnAt(index);
           }
+        }}
+        onSortAsc={(index) => {
+          setSortConfig({ column: index, direction: 'asc' });
+        }}
+        onSortDesc={(index) => {
+          setSortConfig({ column: index, direction: 'desc' });
+        }}
+        onClearSort={(index) => {
+          setSortConfig({ column: null, direction: null });
         }}
       />
     </div>

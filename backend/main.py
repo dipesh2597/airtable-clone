@@ -387,6 +387,104 @@ async def column_operation(sid, data):
         'cells': spreadsheet_data['cells']
     }, skip_sid=sid)
 
+@sio.event
+async def sort_operation(sid, data):
+    """Handle column sorting operations"""
+    column = data.get('column')
+    direction = data.get('direction')  # 'asc', 'desc', or None for clear
+    user_id = user_sessions.get(sid)
+    
+    if user_id not in active_users:
+        return
+    
+    # Handle clear sort operation
+    if column is None or direction is None:
+        # For clear sort, we don't need to do anything to the data
+        # Just broadcast the clear sort state
+        await sio.emit('sort_applied', {
+            'column': None,
+            'direction': None,
+            'user_id': user_id,
+            'cells': spreadsheet_data['cells']
+        })
+        return
+    
+    if direction not in ['asc', 'desc']:
+        return
+    
+    user_name = active_users[user_id]['name']
+    print(f"Sort operation from {user_name}: column {column} {direction}")
+    
+    # Get all rows with data in the sorted column
+    rows_with_data = []
+    
+    for row_index in range(spreadsheet_data['rows']):
+        cell_id = f"{chr(65 + column)}{row_index + 1}"
+        cell_data = spreadsheet_data['cells'].get(cell_id)
+        cell_value = cell_data['value'] if cell_data else ''
+        
+        if cell_value.strip():
+            row_data = {
+                'row_index': row_index,
+                'sort_value': cell_value,
+                'cells': {}
+            }
+            
+            # Collect all cell data for this row
+            for col_index in range(spreadsheet_data['columns']):
+                row_cell_id = f"{chr(65 + col_index)}{row_index + 1}"
+                if row_cell_id in spreadsheet_data['cells']:
+                    row_data['cells'][row_cell_id] = spreadsheet_data['cells'][row_cell_id]
+            
+            rows_with_data.append(row_data)
+    
+    # Sort the rows
+    def sort_key(row):
+        value = row['sort_value'].strip()
+        
+        # Try to parse as number first
+        try:
+            return (0, float(value))  # Numbers sort first
+        except ValueError:
+            return (1, value.lower())  # Then strings (case insensitive)
+    
+    rows_with_data.sort(key=sort_key, reverse=(direction == 'desc'))
+    
+    # Create new cell data with sorted rows
+    new_cells = {}
+    
+    # First, copy all cells that are not in rows with data
+    for cell_id, cell_data in spreadsheet_data['cells'].items():
+        # Parse cell ID to get row index
+        match = re.match(r'([A-Z]+)(\d+)', cell_id)
+        if match:
+            row_index = int(match.group(2)) - 1
+            has_data_in_sort_column = any(row['row_index'] == row_index for row in rows_with_data)
+            if not has_data_in_sort_column:
+                new_cells[cell_id] = cell_data
+    
+    # Then place the sorted rows
+    for new_row_index, row_data in enumerate(rows_with_data):
+        for old_cell_id, cell_data in row_data['cells'].items():
+            # Parse old cell ID to get column
+            match = re.match(r'([A-Z]+)(\d+)', old_cell_id)
+            if match:
+                col_letter = match.group(1)
+                new_cell_id = f"{col_letter}{new_row_index + 1}"
+                new_cells[new_cell_id] = cell_data
+    
+    # Update spreadsheet data
+    spreadsheet_data['cells'] = new_cells
+    spreadsheet_data['metadata']['last_modified'] = datetime.now().isoformat()
+    
+    # Broadcast the sorted data to all users
+    await sio.emit('sort_applied', {
+        'column': column,
+        'direction': direction,
+        'user_id': user_id,
+        'cells': new_cells
+    })
+
 # HTTP endpoints
 @app.get("/")
 async def root():

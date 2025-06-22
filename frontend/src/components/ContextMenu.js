@@ -8,7 +8,11 @@ function ContextMenu({
   onClose, 
   onInsertBefore,
   onInsertAfter,
-  onDelete
+  onDelete,
+  onSortAsc,
+  onSortDesc,
+  onClearSort,
+  sortConfig // { column, direction }
 }) {
   const menuRef = useRef(null);
 
@@ -38,11 +42,29 @@ function ContextMenu({
 
   if (!isVisible) return null;
 
+  const isSorted = sortConfig && sortConfig.column === index;
+  const currentDirection = isSorted ? sortConfig.direction : null;
+
   const menuItems = type === 'row' ? [
     { label: 'Insert row above', action: () => onInsertBefore(index) },
     { label: 'Insert row below', action: () => onInsertAfter(index) },
     { label: 'Delete row', action: () => onDelete(index), destructive: true }
   ] : [
+    { 
+      label: `Sort A→Z ${currentDirection === 'asc' ? '✓' : ''}`, 
+      action: () => onSortAsc(index),
+      disabled: currentDirection === 'asc'
+    },
+    { 
+      label: `Sort Z→A ${currentDirection === 'desc' ? '✓' : ''}`, 
+      action: () => onSortDesc(index),
+      disabled: currentDirection === 'desc'
+    },
+    ...(isSorted ? [{ 
+      label: 'Clear sort', 
+      action: () => onClearSort(index)
+    }] : []),
+    { type: 'separator' },
     { label: 'Insert column left', action: () => onInsertBefore(index) },
     { label: 'Insert column right', action: () => onInsertAfter(index) },
     { label: 'Delete column', action: () => onDelete(index), destructive: true }
@@ -57,20 +79,32 @@ function ContextMenu({
         top: position.y,
       }}
     >
-      {menuItems.map((item, idx) => (
-        <button
-          key={idx}
-          className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
-            item.destructive ? 'text-red-600 hover:bg-red-50' : 'text-gray-700'
-          }`}
-          onClick={() => {
-            item.action();
-            onClose();
-          }}
-        >
-          {item.label}
-        </button>
-      ))}
+      {menuItems.map((item, idx) => {
+        if (item.type === 'separator') {
+          return (
+            <div key={idx} className="border-t border-gray-200 my-1" />
+          );
+        }
+        
+        return (
+          <button
+            key={idx}
+            className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
+              item.destructive ? 'text-red-600 hover:bg-red-50' : 
+              item.disabled ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700'
+            }`}
+            onClick={() => {
+              if (!item.disabled) {
+                item.action();
+                onClose();
+              }
+            }}
+            disabled={item.disabled}
+          >
+            {item.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

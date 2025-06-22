@@ -16,7 +16,7 @@ export const isValidDate = (dateString) => {
   const formatMatches = dateFormats.some(format => format.test(dateString.trim()));
   if (!formatMatches) return false;
   
-  // Try to parse the date
+  // Try to parse the date using JavaScript's native Date constructor
   const date = new Date(dateString);
   return date instanceof Date && !isNaN(date);
 };
@@ -140,7 +140,7 @@ export const getTypeIcon = (type) => {
     case 'number':
       return '123';
     case 'date':
-      return 'CAL';
+      return '📅';
     case 'text':
       return 'T';
     case 'empty':

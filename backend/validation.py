@@ -28,7 +28,7 @@ def is_valid_date(date_string: str) -> bool:
     
     # Try to parse the date
     try:
-        # Try different parsing formats
+        # Try different parsing formats (MM/DD/YYYY, MM/DD/YY, YYYY-MM-DD)
         for fmt in ['%m/%d/%Y', '%m-%d-%Y', '%Y-%m-%d', '%m/%d/%y']:
             try:
                 datetime.strptime(date_string.strip(), fmt)
@@ -107,7 +107,7 @@ def validate_value(value: Union[str, int, float, None], expected_type: str = Non
         'detected_type': detected_type,
         'expected_type': type_to_validate,
         'errors': [],
-        'formatted_value': value
+        'formatted_value': str(value) if value is not None else ''
     }
     
     if value is None or (isinstance(value, str) and value.strip() == ''):
