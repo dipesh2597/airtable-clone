@@ -65,6 +65,7 @@ function Spreadsheet({ socket, user, data, setData }) {
   };
 
   const handleCellClick = (cellId) => {
+    if (!cellId) return;
     setSelectedCell(cellId);
     socket.emit('cell_selection', { cell_id: cellId });
   };
