@@ -7,7 +7,6 @@ const ROWS = 100;
 function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelections }) {
   const [selectedCell, setSelectedCell] = useState('A1');
   const [editingCell, setEditingCell] = useState(null);
-  const [editValue, setEditValue] = useState('');
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
     height: window.innerHeight
@@ -92,8 +91,6 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
     console.log(`Double-clicked cell: ${cellId}`);
     setEditingCell(cellId);
     editingCellRef.current = cellId; // Update ref immediately
-    const cellData = data.cells[cellId];
-    setEditValue(cellData?.value || '');
   };
 
   const handleCellEdit = (cellId, value) => {
@@ -116,7 +113,6 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
     console.log(`📝 Setting editingCell to null`);
     setEditingCell(null);
     editingCellRef.current = null; // Update ref immediately
-    setEditValue('');
     console.log(`📝 Edit mode ended, editingCell should be null`);
   };
 
@@ -129,15 +125,31 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
 
   const handleCellEditAndNavigateRight = (cellId, value) => {
     console.log(`📝 handleCellEditAndNavigateRight called: ${cellId} = "${value}"`);
+    // Handle the cell edit first, then navigate right
     handleCellEdit(cellId, value);
     // Navigate to cell right after editing (for Tab key)
     navigateToCellRight(cellId);
   };
 
   const ensureGridFocus = () => {
+    console.log('🔍 ensureGridFocus called');
+    console.log('🔍 Current active element:', document.activeElement);
+    console.log('🔍 Grid ref:', gridRef.current);
+    
     if (gridRef.current && document.activeElement !== gridRef.current) {
-      console.log('🔍 Ensuring grid focus');
+      console.log('🔍 Setting focus to grid');
       gridRef.current.focus();
+      
+      // Double-check focus was set
+      setTimeout(() => {
+        console.log('🔍 Focus check after timeout - active element:', document.activeElement);
+        if (document.activeElement !== gridRef.current) {
+          console.log('🔍 Focus not set, trying again');
+          gridRef.current.focus();
+        }
+      }, 10);
+    } else {
+      console.log('🔍 Grid already focused or grid ref not available');
     }
   };
 
@@ -155,7 +167,12 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
     selectedCellRef.current = newCellId; // Update ref immediately
     console.log(`🔽 Updated ref to: ${selectedCellRef.current}`);
     socket.emit('cell_selection', { cell_id: newCellId });
-    ensureGridFocus(); // Ensure grid has focus
+    
+    // Ensure grid focus with a slight delay to allow state updates
+    setTimeout(() => {
+      console.log(`🔽 Ensuring grid focus after navigation to ${newCellId}`);
+      ensureGridFocus();
+    }, 5);
   };
 
   const navigateToCellRight = (currentCellId) => {
@@ -172,7 +189,12 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
     selectedCellRef.current = newCellId; // Update ref immediately
     console.log(`➡️ Updated ref to: ${selectedCellRef.current}`);
     socket.emit('cell_selection', { cell_id: newCellId });
-    ensureGridFocus(); // Ensure grid has focus
+    
+    // Ensure grid focus with a slight delay to allow state updates
+    setTimeout(() => {
+      console.log(`➡️ Ensuring grid focus after navigation to ${newCellId}`);
+      ensureGridFocus();
+    }, 5);
   };
 
   const handleKeyDown = (e) => {
@@ -257,8 +279,6 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
         if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
           console.log(`Typing "${e.key}" in cell ${currentSelectedCell}`);
           handleCellDoubleClick(currentSelectedCell);
-          // Set the character as the initial edit value
-          setEditValue(e.key);
         }
         return;
     }
@@ -272,6 +292,12 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
 
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
+      // Don't handle keyboard events if we're in edit mode
+      if (editingCellRef.current) {
+        console.log('❌ Global keyboard handler: In edit mode, ignoring key:', e.key);
+        return;
+      }
+      
       if (document.activeElement === gridRef.current) {
         handleKeyDown(e);
       }
@@ -299,6 +325,16 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
   useEffect(() => {
     selectedCellRef.current = selectedCell;
   }, [selectedCell]);
+
+  // Ensure grid focus whenever selected cell changes (after navigation)
+  useEffect(() => {
+    if (selectedCell && !editingCell) {
+      console.log(`🎯 Selected cell changed to ${selectedCell}, ensuring grid focus`);
+      setTimeout(() => {
+        ensureGridFocus();
+      }, 10);
+    }
+  }, [selectedCell, editingCell]);
 
   // Update ref whenever editingCell changes
   useEffect(() => {
@@ -374,8 +410,6 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
                   onDoubleClick={() => handleCellDoubleClick(cellId)}
                   onEdit={(value) => handleCellEditAndNavigate(cellId, value)}
                   onTabEdit={(value) => handleCellEditAndNavigateRight(cellId, value)}
-                  editValue={editValue}
-                  setEditValue={setEditValue}
                 />
               );
             })}

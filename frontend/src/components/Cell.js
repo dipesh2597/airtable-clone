@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 
 function Cell({ 
   cellId, 
@@ -9,11 +9,20 @@ function Cell({
   onClick, 
   onDoubleClick, 
   onEdit, 
-  editValue, 
-  setEditValue,
   onTabEdit
 }) {
   const inputRef = useRef(null);
+  const [editValue, setEditValue] = useState(value || '');
+  const isNavigatingWithTabRef = useRef(false);
+  const editHandledByTabRef = useRef(false);
+
+  // When entering edit mode, initialize editValue from value prop
+  useEffect(() => {
+    if (isEditing) {
+      setEditValue(value || '');
+      editHandledByTabRef.current = false; // Reset flag when entering edit mode
+    }
+  }, [isEditing, value]);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -35,12 +44,29 @@ function Cell({
     } else if (e.key === 'Tab') {
       e.preventDefault();
       e.stopPropagation();
+      console.log(`🔧 Cell ${cellId}: Tab pressed, setting navigation flag`);
+      isNavigatingWithTabRef.current = true; // Set flag to prevent blur from triggering
+      editHandledByTabRef.current = true; // Mark that Tab will handle the edit
       onTabEdit(editValue); // Save current value and navigate right
+      // The Tab handler will handle both edit and navigation, so we don't need blur to do anything
     }
   };
 
   const handleBlur = () => {
-    onEdit(editValue);
+    console.log(`🔧 Cell ${cellId}: Blur event, isNavigatingWithTab: ${isNavigatingWithTabRef.current}, editHandledByTab: ${editHandledByTabRef.current}`);
+    // Only call onEdit if we're not navigating with Tab and Tab hasn't already handled the edit
+    if (!isNavigatingWithTabRef.current && !editHandledByTabRef.current) {
+      console.log(`🔧 Cell ${cellId}: Calling onEdit from blur`);
+      onEdit(editValue);
+    } else {
+      console.log(`🔧 Cell ${cellId}: Skipping onEdit from blur due to Tab navigation`);
+    }
+    // Reset the flags after a longer delay to prevent multiple blur events
+    setTimeout(() => {
+      isNavigatingWithTabRef.current = false;
+      editHandledByTabRef.current = false;
+      console.log(`🔧 Cell ${cellId}: Reset navigation flags`);
+    }, 100); // Increased from 10ms to 100ms
   };
 
   const displayValue = isEditing ? editValue : value;
