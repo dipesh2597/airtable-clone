@@ -81,16 +81,15 @@ async def disconnect(sid):
     """Handle client disconnection"""
     print(f"Client disconnected: {sid}")
     
-    # Remove user from active users
     if sid in user_sessions:
         user_id = user_sessions[sid]
         if user_id in active_users:
             user_color = active_users[user_id]['color']
             release_color(user_color)
+            print(f"User {active_users[user_id]['name']} left, released color {user_color}")
             del active_users[user_id]
         del user_sessions[sid]
         
-        # Broadcast user left
         await sio.emit('user_left', {'user_id': user_id}, skip_sid=sid)
 
 @sio.event
