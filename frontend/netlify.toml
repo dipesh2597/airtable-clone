@@ -3,11 +3,11 @@
   publish = "build"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "16"
 
 [[redirects]]
   from = "/api/*"
-  to = "https://your-backend-url.railway.app/api/:splat"
+  to = "https://airtable-clone-backend.onrender.com/api/:splat"
   status = 200
   force = true
 
