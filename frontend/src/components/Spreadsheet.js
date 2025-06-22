@@ -25,13 +25,17 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
   useEffect(() => {
     if (!socket) return;
 
-    socket.on('cell_updated', ({ cell_id, value, user_id }) => {
+    socket.on('cell_updated', ({ cell_id, value, original_value, data_type, is_valid, validation_errors, user_id }) => {
       setData(prev => ({
         ...prev,
         cells: {
           ...prev.cells,
           [cell_id]: {
             value,
+            original_value,
+            data_type,
+            is_valid,
+            validation_errors,
             last_modified_by: user_id,
             last_modified_at: new Date().toISOString()
           }

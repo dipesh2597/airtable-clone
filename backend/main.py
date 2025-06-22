@@ -8,6 +8,7 @@ import json
 import uuid
 from datetime import datetime
 import re
+from validation import validate_value, detect_data_type
 
 # Initialize FastAPI app
 app = FastAPI(title="Airtable Clone API", version="1.0.0")
@@ -153,7 +154,7 @@ async def join_spreadsheet(sid, data):
 
 @sio.event
 async def cell_update(sid, data):
-    """Handle cell value updates"""
+    """Handle cell value updates with validation"""
     cell_id = data.get('cell_id')
     value = data.get('value')
     user_id = user_sessions.get(sid)
@@ -165,18 +166,33 @@ async def cell_update(sid, data):
     user_name = active_users[user_id]['name']
     print(f"Cell update from {user_name} ({user_id}): {cell_id} = '{value}'")
     
-    # Update spreadsheet data
+    # Validate the value
+    validation_result = validate_value(value)
+    
+    # Update spreadsheet data with validation info
     spreadsheet_data['cells'][cell_id] = {
-        'value': value,
+        'value': validation_result['formatted_value'],
+        'original_value': value,  # Keep original input
+        'data_type': validation_result['detected_type'],
+        'is_valid': validation_result['is_valid'],
+        'validation_errors': validation_result['errors'],
         'last_modified_by': user_id,
         'last_modified_at': datetime.now().isoformat()
     }
     
-    print(f"Broadcasting cell_updated to all other users: {cell_id} = '{value}'")
-    # Broadcast update to all other users
+    print(f"Validation result: type={validation_result['detected_type']}, valid={validation_result['is_valid']}")
+    if not validation_result['is_valid']:
+        print(f"Validation errors: {validation_result['errors']}")
+    
+    print(f"Broadcasting cell_updated to all other users: {cell_id} = '{validation_result['formatted_value']}'")
+    # Broadcast update to all other users with validation info
     await sio.emit('cell_updated', {
         'cell_id': cell_id,
-        'value': value,
+        'value': validation_result['formatted_value'],
+        'original_value': value,
+        'data_type': validation_result['detected_type'],
+        'is_valid': validation_result['is_valid'],
+        'validation_errors': validation_result['errors'],
         'user_id': user_id
     }, skip_sid=sid)
 
