@@ -140,7 +140,7 @@ export const getTypeIcon = (type) => {
     case 'number':
       return '123';
     case 'date':
-      return '📅';
+      return 'CAL';
     case 'text':
       return 'T';
     case 'empty':

@@ -65,7 +65,6 @@ function Cell({
     } else if (e.key === 'Tab') {
       e.preventDefault();
       e.stopPropagation();
-      console.log(`🔧 Cell ${cellId}: Tab pressed, setting navigation flag`);
       isNavigatingWithTabRef.current = true; // Set flag to prevent blur from triggering
       editHandledByTabRef.current = true; // Mark that Tab will handle the edit
       
@@ -81,10 +80,8 @@ function Cell({
   };
 
   const handleBlur = () => {
-    console.log(`🔧 Cell ${cellId}: Blur event, isNavigatingWithTab: ${isNavigatingWithTabRef.current}, editHandledByTab: ${editHandledByTabRef.current}`);
     // Only call onEdit if we're not navigating with Tab and Tab hasn't already handled the edit
     if (!isNavigatingWithTabRef.current && !editHandledByTabRef.current) {
-      console.log(`🔧 Cell ${cellId}: Calling onEdit from blur`);
       // Validate before saving
       const validation = validateValue(editValue);
       if (validation.isValid) {
@@ -93,15 +90,12 @@ function Cell({
         console.warn(`Validation error in ${cellId}:`, validation.errors);
         onEdit(editValue); // Save anyway, but show error
       }
-    } else {
-      console.log(`🔧 Cell ${cellId}: Skipping onEdit from blur due to Tab navigation`);
     }
     // Reset the flags after a longer delay to prevent multiple blur events
     setTimeout(() => {
       isNavigatingWithTabRef.current = false;
       editHandledByTabRef.current = false;
-      console.log(`🔧 Cell ${cellId}: Reset navigation flags`);
-    }, 100); // Increased from 10ms to 100ms
+    }, 100);
   };
 
   const displayValue = isEditing ? editValue : (validationResult?.formattedValue || (typeof value === 'string' ? value : ''));

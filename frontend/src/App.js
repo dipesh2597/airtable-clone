@@ -41,12 +41,10 @@ function App() {
     });
 
     newSocket.on('active_users', (users) => {
-      console.log('Received active_users update:', users);
       setActiveUsers(users);
     });
 
     newSocket.on('user_joined', (userData) => {
-      console.log('User joined:', userData);
       setActiveUsers(prev => {
         // Convert user_joined data to match active_users format
         const newUser = {
@@ -56,23 +54,18 @@ function App() {
           current_cell: null
         };
         const newUsers = [...prev, newUser];
-        console.log('Updated user list after join:', newUsers);
         return newUsers;
       });
     });
 
     newSocket.on('user_left', (userData) => {
-      console.log('User left - removing from list:', userData);
-      console.log('Current active users before removal:', activeUsers);
       setActiveUsers(prevUsers => {
         const filteredUsers = prevUsers.filter(user => user.sid !== userData.user_id);
-        console.log('Updated user list after user left:', filteredUsers);
         return filteredUsers;
       });
     });
 
     newSocket.on('user_selection', (data) => {
-      console.log('Received user selection:', data);
       setUserSelections(prev => ({
         ...prev,
         [data.user_id]: data
@@ -80,11 +73,9 @@ function App() {
     });
 
     newSocket.on('user_selection_cleared', (data) => {
-      console.log('User left - clearing their selection:', data);
       setUserSelections(prev => {
         const newSelections = { ...prev };
         delete newSelections[data.user_id];
-        console.log('Updated user selections after user left:', newSelections);
         return newSelections;
       });
     });

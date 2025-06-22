@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Cell from './Cell';
+import ContextMenu from './ContextMenu';
 
 const COLUMNS = 26;
 const ROWS = 100;
@@ -10,6 +11,7 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
   const selectedRangeRef = useRef(null);
   const [editingCell, setEditingCell] = useState(null);
   const [clipboard, setClipboard] = useState(null); // { data: [], type: 'copy' | 'cut' }
+  const [contextMenu, setContextMenu] = useState({ isVisible: false, position: { x: 0, y: 0 }, type: null, index: null });
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
     height: window.innerHeight
@@ -45,28 +47,50 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
 
     socket.on('cell_selected', ({ cell_id, user_id, user_name, user_color }) => {
       if (user_id !== socket.id) {
-        console.log('Cell selected by other user:', { cell_id, user_id, user_name, user_color });
+    
         setUserSelections(prev => {
           // Clear any previous selection by this user
           const newSelections = { ...prev };
           Object.keys(newSelections).forEach(cellId => {
             if (newSelections[cellId].user_id === user_id) {
-              console.log('Clearing previous selection for user:', user_id, 'from cell:', cellId);
+
               delete newSelections[cellId];
             }
           });
           // Add the new selection
           newSelections[cell_id] = { user_id, user_name, user_color };
-          console.log('Updated user selections:', newSelections);
+
           return newSelections;
         });
       }
+    });
+
+    socket.on('row_operation_applied', ({ type, index, user_id, cells }) => {
+      
+      setData(prev => ({
+        ...prev,
+        cells: cells
+      }));
+      // Close context menu if open
+      setContextMenu({ isVisible: false, position: { x: 0, y: 0 }, type: null, index: null });
+    });
+
+    socket.on('column_operation_applied', ({ type, index, user_id, cells }) => {
+      
+      setData(prev => ({
+        ...prev,
+        cells: cells
+      }));
+      // Close context menu if open
+      setContextMenu({ isVisible: false, position: { x: 0, y: 0 }, type: null, index: null });
     });
 
     return () => {
         if (socket) {
             socket.off('cell_updated');
             socket.off('cell_selected');
+            socket.off('row_operation_applied');
+            socket.off('column_operation_applied');
         }
     };
   }, [socket, setData, setUserSelections]);
@@ -138,8 +162,6 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
   };
 
   const copySelection = () => {
-    console.log('📋 copySelection called, selectedRange:', selectedRange, 'selectedCell:', selectedCell);
-    
     if (selectedRange) {
       // Copy range selection
       const rangeData = getCellRange(selectedRange.start, selectedRange.end);
@@ -152,7 +174,7 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
         type: 'copy'
       });
       
-      console.log('📋 Copied range selection:', clipboardData);
+
     } else if (selectedCell) {
       // Copy single cell
       const cellValue = data.cells[selectedCell]?.value || '';
@@ -161,15 +183,11 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
         type: 'copy'
       });
       
-      console.log('📋 Copied single cell:', cellValue);
-    } else {
-      console.log('📋 No selection to copy');
+
     }
   };
 
   const cutSelection = () => {
-    console.log('✂️ cutSelection called, selectedRange:', selectedRange, 'selectedCell:', selectedCell);
-    
     if (selectedRange) {
       // Cut range selection
       copySelection();
@@ -192,7 +210,7 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
         socket.emit('cell_update', { cell_id: cellId, value });
       });
       
-      console.log('✂️ Cut range selection');
+
     } else if (selectedCell) {
       // Cut single cell
       copySelection();
@@ -206,17 +224,13 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
       
       socket.emit('cell_update', { cell_id: selectedCell, value: '' });
       
-      console.log('✂️ Cut single cell');
-    } else {
-      console.log('✂️ No selection to cut');
+
     }
   };
 
   const pasteSelection = (targetCell) => {
     const cellToPaste = targetCell || selectedCell;
-    console.log('📋 pasteSelection called, targetCell:', cellToPaste, 'clipboard:', clipboard);
     if (!clipboard || !clipboard.data.length) {
-      console.log('📋 No clipboard data to paste');
       return;
     }
     
@@ -245,7 +259,7 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
       socket.emit('cell_update', { cell_id: cellId, value });
     });
     
-    console.log('📋 Pasted selection to:', cellToPaste, updates);
+
   };
 
   const handleCellClick = (cellId, event) => {
@@ -268,8 +282,7 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
 
   const handleCellMouseDown = (cellId, event) => {
     if (event.button === 0) {
-      // Log selection start
-      console.log(`Selection started at cell: ${cellId}`);
+
       setSelectedCell(cellId);
       selectedCellRef.current = cellId;
       selectionStartRef.current = cellId; // Set selection start
@@ -286,78 +299,55 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
     }
   };
 
-  const handleCellMouseUp = () => {
-    // Log selection end
-    if (isSelectingRef.current) {
-      console.log('Selection ended');
-    }
-    isSelectingRef.current = false;
-  };
+      const handleCellMouseUp = () => {
+      isSelectingRef.current = false;
+    };
 
-  const handleCellDoubleClick = (cellId) => {
-    console.log(`Double-clicked cell: ${cellId}`);
-    setEditingCell(cellId);
-    editingCellRef.current = cellId; // Update ref immediately
-  };
+      const handleCellDoubleClick = (cellId) => {
+      setEditingCell(cellId);
+      editingCellRef.current = cellId; // Update ref immediately
+    };
 
-  const handleCellEdit = (cellId, value) => {
-    console.log(`📝 handleCellEdit called: ${cellId} = "${value}"`);
-    
-    setData(prev => ({
-      ...prev,
-      cells: {
-        ...prev.cells,
-        [cellId]: {
-          value,
-          last_modified_by: user.id,
-          last_modified_at: new Date().toISOString()
-        }
-      }
-    }));
+      const handleCellEdit = (cellId, value) => {
+      setData(prev => ({
+        ...prev,
+        cells: { ...prev.cells, [cellId]: value }
+      }));
 
-    console.log(`📝 Sending cell_update event to server: ${cellId} = "${value}"`);
-    socket.emit('cell_update', { cell_id: cellId, value });
-    console.log(`📝 Setting editingCell to null`);
-    setEditingCell(null);
-    editingCellRef.current = null; // Update ref immediately
-    console.log(`📝 Edit mode ended, editingCell should be null`);
-  };
+      // Update the ref immediately to prevent stale data
+      dataRef.current = {
+        ...dataRef.current,
+        cells: { ...dataRef.current.cells, [cellId]: value }
+      };
 
-  const handleCellEditAndNavigate = (cellId, value) => {
-    console.log(`📝 handleCellEditAndNavigate called: ${cellId} = "${value}"`);
-    handleCellEdit(cellId, value);
-    // Navigate to cell below after editing (for Enter key)
-    navigateToCellBelow(cellId);
-  };
+      socket.emit('cell_update', { cell_id: cellId, value });
+      setEditingCell(null);
+      editingCellRef.current = null; // Update ref immediately
+    };
 
-  const handleCellEditAndNavigateRight = (cellId, value) => {
-    console.log(`📝 handleCellEditAndNavigateRight called: ${cellId} = "${value}"`);
-    // Handle the cell edit first, then navigate right
-    handleCellEdit(cellId, value);
-    // Navigate to cell right after editing (for Tab key)
-    navigateToCellRight(cellId);
-  };
+      const handleCellEditAndNavigate = (cellId, value) => {
+      handleCellEdit(cellId, value);
+      // Navigate to cell below after editing (for Enter key)
+      setTimeout(() => navigateToCellBelow(cellId), 5);
+    };
+
+      const handleCellEditAndNavigateRight = (cellId, value) => {
+      // Handle the cell edit first, then navigate right
+      handleCellEdit(cellId, value);
+      // Navigate to the right after editing (for Tab key)
+      setTimeout(() => navigateToCellRight(cellId), 5);
+    };
 
   const ensureGridFocus = () => {
-    console.log('🔍 ensureGridFocus called');
-    console.log('🔍 Current active element:', document.activeElement);
-    console.log('🔍 Grid ref:', gridRef.current);
-    
     if (gridRef.current && document.activeElement !== gridRef.current) {
-      console.log('🔍 Setting focus to grid');
-      // Prevent scroll when focusing grid
       gridRef.current.focus({ preventScroll: true });
       
       // Double-check focus was set
       setTimeout(() => {
-        console.log('🔍 Focus check after timeout - active element:', document.activeElement);
         if (document.activeElement !== gridRef.current) {
-          console.log('🔍 Focus not set, trying again');
-          gridRef.current.focus({ preventScroll: true });
+          gridRef.current?.focus({ preventScroll: true });
         }
       }, 10);
-    } else {
-      console.log('🔍 Grid already focused or grid ref not available');
     }
   };
 
@@ -380,75 +370,42 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
   }
 
   const navigateToCellBelow = (currentCellId) => {
-    console.log(`🔽 navigateToCellBelow called with: ${currentCellId}`);
-    const [col, row] = currentCellId.match(/([A-Z]+)(\d+)/).slice(1);
-    const colIndex = col.charCodeAt(0) - 65;
-    const rowIndex = parseInt(row) - 1;
-    
-    const newRowIndex = Math.min(ROWS - 1, rowIndex + 1);
-    const newCellId = getCellId(newRowIndex, colIndex);
-    
-    console.log(`🔽 Navigating to cell below: ${newCellId}`);
-    setSelectedCell(newCellId);
-    selectedCellRef.current = newCellId; // Update ref immediately
-    console.log(`🔽 Updated ref to: ${selectedCellRef.current}`);
-    socket.emit('cell_selection', { cell_id: newCellId });
-    
-    // Ensure grid focus with a slight delay to allow state updates
-    setTimeout(() => {
-      scrollCellIntoView(newCellId);
-      // Only focus grid if not editing (prevents scroll jump after Tab/Enter in edit mode)
-      if (!editingCellRef.current) {
-        ensureGridFocus();
-      }
-    }, 5);
+    const { row, col } = parseCellId(currentCellId);
+    if (row < ROWS - 1) {
+      const newCellId = getCellId(row + 1, col);
+      setSelectedCell(newCellId);
+      selectedCellRef.current = newCellId;
+      
+      // Don't call ensureGridFocus here to prevent scroll issues
+    }
   };
 
   const navigateToCellRight = (currentCellId) => {
-    console.log(`➡️ navigateToCellRight called with: ${currentCellId}`);
-    const [col, row] = currentCellId.match(/([A-Z]+)(\d+)/).slice(1);
-    const colIndex = col.charCodeAt(0) - 65;
-    const rowIndex = parseInt(row) - 1;
-    
-    const newColIndex = Math.min(COLUMNS - 1, colIndex + 1);
-    const newCellId = getCellId(rowIndex, newColIndex);
-    
-    console.log(`➡️ Navigating to cell right: ${newCellId}`);
-    setSelectedCell(newCellId);
-    selectedCellRef.current = newCellId; // Update ref immediately
-    console.log(`➡️ Updated ref to: ${selectedCellRef.current}`);
-    socket.emit('cell_selection', { cell_id: newCellId });
-    
-    // Ensure grid focus with a slight delay to allow state updates
-    setTimeout(() => {
-      scrollCellIntoView(newCellId);
-      // Only focus grid if not editing (prevents scroll jump after Tab/Enter in edit mode)
-      if (!editingCellRef.current) {
-        ensureGridFocus();
-      }
-    }, 5);
+    const { row, col } = parseCellId(currentCellId);
+    if (col < COLUMNS - 1) {
+      const newCellId = getCellId(row, col + 1);
+      setSelectedCell(newCellId);
+      selectedCellRef.current = newCellId;
+      
+      // Don't call ensureGridFocus here to prevent scroll issues
+    }
   };
 
   const handleKeyDown = (e) => {
     const currentSelectedCell = selectedCellRef.current;
     const currentEditingCell = editingCellRef.current;
-    console.log(`🔍 Keyboard handler - selectedCell: ${selectedCell}, ref: ${currentSelectedCell}, editingCell: ${editingCell}, ref: ${currentEditingCell}`);
-    console.log(`🔍 Focus check - document.activeElement: ${document.activeElement}, gridRef.current: ${gridRef.current}`);
     
     if (!currentSelectedCell) {
-      console.log('❌ No selected cell, returning');
       return;
     }
     
-    // Check if grid has focus
+    // Check if grid is focused
     if (document.activeElement !== gridRef.current) {
-      console.log('❌ Grid not focused, returning');
       return;
     }
     
-    // Don't handle keyboard navigation if we're in edit mode
+    // Don't handle navigation if we're in edit mode
     if (currentEditingCell) {
-      console.log('❌ In edit mode, keyboard navigation disabled');
       return;
     }
 
@@ -468,7 +425,7 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
             console.warn('Could not write range to system clipboard:', err);
           });
         }
-        console.log('Copied range to clipboard:', clipboardString);
+
       } else {
         // Single cell copy
         const value = dataRef.current.cells[currentSelectedCell]?.value || '';
@@ -478,7 +435,7 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
             console.warn('Could not write to system clipboard:', err);
           });
         }
-        console.log('Copied cell value:', value);
+        
       }
       return;
     }
@@ -500,56 +457,48 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
     let newRowIndex = rowIndex;
 
     switch (e.key) {
-      case 'ArrowUp':
-        e.preventDefault();
-        newRowIndex = Math.max(0, rowIndex - 1);
-        console.log(`Arrow Up: Moving from ${currentSelectedCell} to row ${newRowIndex + 1}`);
-        break;
-      case 'ArrowDown':
-        e.preventDefault();
-        newRowIndex = Math.min(ROWS - 1, rowIndex + 1);
-        console.log(`Arrow Down: Moving from ${currentSelectedCell} to row ${newRowIndex + 1}`);
-        break;
-      case 'ArrowLeft':
-        e.preventDefault();
-        newColIndex = Math.max(0, colIndex - 1);
-        console.log(`Arrow Left: Moving from ${currentSelectedCell} to column ${String.fromCharCode(65 + newColIndex)}`);
-        break;
-      case 'ArrowRight':
-        e.preventDefault();
-        newColIndex = Math.min(COLUMNS - 1, colIndex + 1);
-        console.log(`Arrow Right: Moving from ${currentSelectedCell} to column ${String.fromCharCode(65 + newColIndex)}`);
-        break;
-      case 'Tab':
-        e.preventDefault();
-        if (e.shiftKey) {
-          newColIndex = Math.max(0, colIndex - 1);
-          console.log(`Shift+Tab: Moving from ${currentSelectedCell} to column ${String.fromCharCode(65 + newColIndex)}`);
-        } else {
-          newColIndex = Math.min(COLUMNS - 1, colIndex + 1);
-          console.log(`Tab: Moving from ${currentSelectedCell} to column ${String.fromCharCode(65 + newColIndex)}`);
-        }
-        break;
-      case 'Enter':
-        e.preventDefault();
-        if (e.shiftKey) {
+              case 'ArrowUp':
+          e.preventDefault();
           newRowIndex = Math.max(0, rowIndex - 1);
-          console.log(`Shift+Enter: Moving from ${currentSelectedCell} to row ${newRowIndex + 1}`);
-        } else {
-          // Enter edit mode instead of moving down
-          console.log(`Enter: Entering edit mode for cell ${currentSelectedCell}`);
-          handleCellDoubleClick(currentSelectedCell);
-          return;
-        }
-        break;
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          newRowIndex = Math.min(ROWS - 1, rowIndex + 1);
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          newColIndex = Math.max(0, colIndex - 1);
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          newColIndex = Math.min(COLUMNS - 1, colIndex + 1);
+          break;
+              case 'Tab':
+          e.preventDefault();
+          if (e.shiftKey) {
+            newColIndex = Math.max(0, colIndex - 1);
+          } else {
+            newColIndex = Math.min(COLUMNS - 1, colIndex + 1);
+          }
+          break;
+              case 'Enter':
+          e.preventDefault();
+          if (e.shiftKey) {
+            newRowIndex = Math.max(0, rowIndex - 1);
+          } else {
+            // Enter edit mode instead of moving down
+            handleCellDoubleClick(currentSelectedCell);
+            return;
+          }
+          break;
       case 'Backspace':
         e.preventDefault();
         const rangeToUse = selectedRangeRef.current;
-        console.log('Backspace/Delete pressed. selectedRange:', rangeToUse, 'selectedCell:', currentSelectedCell);
+
         if (rangeToUse) {
           // Clear all cells in the selected range
           const rangeData = getCellRange(rangeToUse.start, rangeToUse.end);
-          console.log('Range data to clear:', rangeData);
+          
           const updates = {};
           rangeData.flat().forEach(cellId => {
             updates[cellId] = {
@@ -557,7 +506,7 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
               last_modified_by: user.id,
               last_modified_at: new Date().toISOString()
             };
-            console.log('Clearing cell:', cellId);
+            
           });
           setData(prev => ({
             ...prev,
@@ -567,27 +516,23 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
           Object.entries(updates).forEach(([cellId, cellObj]) => {
             socket.emit('cell_update', { cell_id: cellId, value: '' });
           });
-          console.log('Cleared selected range');
+          
         } else {
           // Single cell clear (already working)
-          console.log('Clearing single cell:', currentSelectedCell);
+          
           handleCellEdit(currentSelectedCell, '');
         }
         return;
-      default:
-        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
-          console.log(`Typing "${e.key}" in cell ${currentSelectedCell}`);
-          handleCellDoubleClick(currentSelectedCell);
-        }
-        return;
+              default:
+          if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+            handleCellDoubleClick(currentSelectedCell);
+          }
+          return;
     }
 
     const newCellId = getCellId(newRowIndex, newColIndex);
-    console.log(`✅ Navigating from ${currentSelectedCell} to ${newCellId}`);
-    
-    // Handle selection with Shift key
-    if (e.shiftKey) {
-      console.log(`🖱️ Extending selection from ${selectionStartRef.current} to ${newCellId}`);
+          // Handle selection with Shift key
+      if (e.shiftKey) {
       setSelectedRange({
         start: selectionStartRef.current,
         end: newCellId
@@ -601,20 +546,15 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
     selectedCellRef.current = newCellId; // Update ref immediately
     socket.emit('cell_selection', { cell_id: newCellId });
 
-    // Log navigation
-    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Tab","Enter"].includes(e.key)) {
-      console.log(`Key navigation: ${e.key}`);
-    }
+    
   };
 
-  // Paste handler for the hidden input
-  const handlePasteInput = (e) => {
-    console.log("Paste event triggered");
-    const pastedText = e.clipboardData.getData('text');
-    if (selectedCell && typeof pastedText === 'string') {
-      // Multi-cell paste: parse tab/newline string
-      if (pastedText.includes('\t') || pastedText.includes('\n')) {
-        console.log("Handling multi-cell paste");
+      // Paste handler for the hidden input
+    const handlePasteInput = (e) => {
+      const pastedText = e.clipboardData.getData('text');
+      if (selectedCell && typeof pastedText === 'string') {
+        // Multi-cell paste: parse tab/newline string
+        if (pastedText.includes('\t') || pastedText.includes('\n')) {
         const rows = pastedText.split(/\r?\n/);
         const values2D = rows.map(row => row.split('\t'));
         const start = parseCellId(selectedCell);
@@ -622,10 +562,9 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
         for (let r = 0; r < values2D.length; r++) {
           for (let c = 0; c < values2D[r].length; c++) {
             const value = values2D[r][c];
-            const targetRow = start.row + r;
-            const targetCol = start.col + c;
-            console.log(`Setting cell [${targetRow}, ${targetCol}] to:`, value);
-            if (targetRow < ROWS && targetCol < COLUMNS) {
+                          const targetRow = start.row + r;
+              const targetCol = start.col + c;
+              if (targetRow < ROWS && targetCol < COLUMNS) {
               const cellId = getCellId(targetRow, targetCol);
               updates[cellId] = {
                 value: value,
@@ -642,9 +581,7 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
         Object.entries(updates).forEach(([cellId, cellObj]) => {
           socket.emit('cell_update', { cell_id: cellId, value: cellObj.value });
         });
-        console.log('Pasted multi-cell value (from system clipboard):', values2D);
-      } else {
-        console.log("Handling single-cell paste");
+                } else {
         // Single cell paste
         setData(prev => ({
           ...prev,
@@ -657,20 +594,17 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
             }
           }
         }));
-        socket.emit('cell_update', { cell_id: selectedCell, value: pastedText });
-        console.log('Pasted cell value (from system clipboard):', pastedText);
+                  socket.emit('cell_update', { cell_id: selectedCell, value: pastedText });
       }
     }
     // Do not focus grid here - let navigation handle focus management
   };
 
   useEffect(() => {
-    const handleGlobalKeyDown = (e) => {
-      // Don't handle keyboard events if we're in edit mode
-      if (editingCellRef.current) {
-        console.log('❌ Global keyboard handler: In edit mode, ignoring key:', e.key);
-        return;
-      }
+          const handleGlobalKeyDown = (e) => {
+        if (editingCellRef.current) {
+          return;
+        }
       
       if (document.activeElement === gridRef.current) {
         handleKeyDown(e);
@@ -696,12 +630,11 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
 
   // Global mouse up handler to end selection
   useEffect(() => {
-    const handleGlobalMouseUp = () => {
-      if (isSelectingRef.current) {
-        console.log('🖱️ Global mouse up, ending selection');
-        isSelectingRef.current = false;
-      }
-    };
+          const handleGlobalMouseUp = () => {
+        if (isSelectingRef.current) {
+          isSelectingRef.current = false;
+        }
+      };
 
     document.addEventListener('mouseup', handleGlobalMouseUp);
     return () => document.removeEventListener('mouseup', handleGlobalMouseUp);
@@ -748,6 +681,165 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
     }
   };
 
+  // Row/Column operation functions
+  const insertRowAt = (rowIndex, position = 'after') => {
+    const insertIndex = position === 'before' ? rowIndex : rowIndex + 1;
+    
+    // Create new cell data structure by shifting existing cells
+    const newCells = {};
+    
+    // Copy existing cells, shifting row numbers for cells after the insert point
+    Object.entries(data.cells).forEach(([cellId, cellData]) => {
+      const cellPos = parseCellId(cellId);
+      if (cellPos.row >= insertIndex) {
+        // Shift this cell down by one row
+        const newCellId = getCellId(cellPos.row + 1, cellPos.col);
+        newCells[newCellId] = cellData;
+      } else {
+        // Keep this cell in the same position
+        newCells[cellId] = cellData;
+      }
+    });
+    
+    // Update data
+    setData(prev => ({
+      ...prev,
+      cells: newCells
+    }));
+    
+    // Emit to server
+    socket.emit('row_operation', {
+      type: 'insert',
+      index: insertIndex,
+      user_id: user.id
+    });
+  };
+
+  const deleteRowAt = (rowIndex) => {
+    
+    // Create new cell data structure by removing cells in the row and shifting others
+    const newCells = {};
+    
+    Object.entries(data.cells).forEach(([cellId, cellData]) => {
+      const cellPos = parseCellId(cellId);
+      if (cellPos.row === rowIndex) {
+        // Delete this cell (don't add to newCells)
+        return;
+      } else if (cellPos.row > rowIndex) {
+        // Shift this cell up by one row
+        const newCellId = getCellId(cellPos.row - 1, cellPos.col);
+        newCells[newCellId] = cellData;
+      } else {
+        // Keep this cell in the same position
+        newCells[cellId] = cellData;
+      }
+    });
+    
+    // Update data
+    setData(prev => ({
+      ...prev,
+      cells: newCells
+    }));
+    
+    // Emit to server
+    socket.emit('row_operation', {
+      type: 'delete',
+      index: rowIndex,
+      user_id: user.id
+    });
+  };
+
+  const insertColumnAt = (colIndex, position = 'after') => {
+    const insertIndex = position === 'before' ? colIndex : colIndex + 1;
+    
+    // Create new cell data structure by shifting existing cells
+    const newCells = {};
+    
+    Object.entries(data.cells).forEach(([cellId, cellData]) => {
+      const cellPos = parseCellId(cellId);
+      if (cellPos.col >= insertIndex) {
+        // Shift this cell right by one column
+        const newCellId = getCellId(cellPos.row, cellPos.col + 1);
+        newCells[newCellId] = cellData;
+      } else {
+        // Keep this cell in the same position
+        newCells[cellId] = cellData;
+      }
+    });
+    
+    // Update data
+    setData(prev => ({
+      ...prev,
+      cells: newCells
+    }));
+    
+    // Emit to server
+    socket.emit('column_operation', {
+      type: 'insert',
+      index: insertIndex,
+      user_id: user.id
+    });
+  };
+
+  const deleteColumnAt = (colIndex) => {
+    
+    // Create new cell data structure by removing cells in the column and shifting others
+    const newCells = {};
+    
+    Object.entries(data.cells).forEach(([cellId, cellData]) => {
+      const cellPos = parseCellId(cellId);
+      if (cellPos.col === colIndex) {
+        // Delete this cell (don't add to newCells)
+        return;
+      } else if (cellPos.col > colIndex) {
+        // Shift this cell left by one column
+        const newCellId = getCellId(cellPos.row, cellPos.col - 1);
+        newCells[newCellId] = cellData;
+      } else {
+        // Keep this cell in the same position
+        newCells[cellId] = cellData;
+      }
+    });
+    
+    // Update data
+    setData(prev => ({
+      ...prev,
+      cells: newCells
+    }));
+    
+    // Emit to server
+    socket.emit('column_operation', {
+      type: 'delete',
+      index: colIndex,
+      user_id: user.id
+    });
+  };
+
+  // Context menu handlers
+  const handleRowRightClick = (e, rowIndex) => {
+    e.preventDefault();
+    setContextMenu({
+      isVisible: true,
+      position: { x: e.clientX, y: e.clientY },
+      type: 'row',
+      index: rowIndex
+    });
+  };
+
+  const handleColumnRightClick = (e, colIndex) => {
+    e.preventDefault();
+    setContextMenu({
+      isVisible: true,
+      position: { x: e.clientX, y: e.clientY },
+      type: 'column',
+      index: colIndex
+    });
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu({ isVisible: false, position: { x: 0, y: 0 }, type: null, index: null });
+  };
+
   return (
     <div className="h-screen overflow-auto bg-white" style={{ scrollBehavior: 'smooth' }}>
       <div className="sticky top-0 bg-white z-10">
@@ -773,9 +865,11 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
             return (
               <div
                 key={colIndex}
-                className={`w-16 sm:w-20 lg:w-24 h-8 flex items-center justify-center border-r border-gray-300 text-xs sm:text-sm font-medium text-gray-700 flex-shrink-0 select-none
+                className={`w-16 sm:w-20 lg:w-24 h-8 flex items-center justify-center border-r border-gray-300 text-xs sm:text-sm font-medium text-gray-700 flex-shrink-0 select-none cursor-pointer hover:bg-gray-200
                   ${colIsHighlighted ? 'bg-blue-100' : 'bg-gray-100'}
                 `}
+                onContextMenu={(e) => handleColumnRightClick(e, colIndex)}
+                title={`Right-click for column options`}
               >
                 {getColumnLabel(colIndex)}
               </div>
@@ -810,9 +904,11 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
           return (
             <React.Fragment key={rowIndex}>
               <div
-                className={`w-12 sm:w-16 h-8 flex items-center justify-center sticky left-0 flex-shrink-0 border-r border-b border-gray-300 text-xs sm:text-sm text-gray-600 z-10 select-none
+                className={`w-12 sm:w-16 h-8 flex items-center justify-center sticky left-0 flex-shrink-0 border-r border-b border-gray-300 text-xs sm:text-sm text-gray-600 z-10 select-none cursor-pointer hover:bg-gray-200
                   ${rowIsHighlighted ? 'bg-blue-100' : 'bg-gray-100'}
                 `}
+                onContextMenu={(e) => handleRowRightClick(e, rowIndex)}
+                title={`Right-click for row options`}
               >
                 {rowIndex + 1}
               </div>
@@ -849,6 +945,35 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
       </div>
 
       <input ref={pasteInputRef} type="text" style={{ position: 'absolute', left: '-9999px', width: 0, height: 0, opacity: 0 }} onPaste={handlePasteInput} tabIndex={-1} aria-hidden="true" />
+      
+      <ContextMenu
+        isVisible={contextMenu.isVisible}
+        position={contextMenu.position}
+        type={contextMenu.type}
+        index={contextMenu.index}
+        onClose={closeContextMenu}
+        onInsertBefore={(index) => {
+          if (contextMenu.type === 'row') {
+            insertRowAt(index, 'before');
+          } else {
+            insertColumnAt(index, 'before');
+          }
+        }}
+        onInsertAfter={(index) => {
+          if (contextMenu.type === 'row') {
+            insertRowAt(index, 'after');
+          } else {
+            insertColumnAt(index, 'after');
+          }
+        }}
+        onDelete={(index) => {
+          if (contextMenu.type === 'row') {
+            deleteRowAt(index);
+          } else {
+            deleteColumnAt(index);
+          }
+        }}
+      />
     </div>
   );
 }

@@ -241,6 +241,152 @@ async def cell_selection(sid, data):
         }
     }, skip_sid=sid)
 
+@sio.event
+async def row_operation(sid, data):
+    """Handle row insert/delete operations"""
+    operation_type = data.get('type')  # 'insert' or 'delete'
+    row_index = data.get('index')
+    user_id = user_sessions.get(sid)
+    
+    if user_id not in active_users:
+        print(f"Invalid row_operation: user_id={user_id} not in active_users")
+        return
+    
+    user_name = active_users[user_id]['name']
+    print(f"Row operation from {user_name} ({user_id}): {operation_type} at index {row_index}")
+    
+    if operation_type == 'insert':
+        # Shift all cells down that are at or after the insert index
+        new_cells = {}
+        for cell_id, cell_data in spreadsheet_data['cells'].items():
+            # Parse cell coordinates
+            col_match = re.match(r'^([A-Z]+)', cell_id)
+            row_match = re.search(r'(\d+)$', cell_id)
+            if col_match and row_match:
+                col = col_match.group(1)
+                row = int(row_match.group(1)) - 1  # Convert to 0-based
+                
+                if row >= row_index:
+                    # Shift this cell down by one row
+                    new_cell_id = f"{col}{row + 2}"  # +2 because we convert back to 1-based and add 1
+                    new_cells[new_cell_id] = cell_data
+                else:
+                    # Keep this cell in the same position
+                    new_cells[cell_id] = cell_data
+        
+        spreadsheet_data['cells'] = new_cells
+        
+    elif operation_type == 'delete':
+        # Remove all cells in the row and shift others up
+        new_cells = {}
+        for cell_id, cell_data in spreadsheet_data['cells'].items():
+            # Parse cell coordinates
+            col_match = re.match(r'^([A-Z]+)', cell_id)
+            row_match = re.search(r'(\d+)$', cell_id)
+            if col_match and row_match:
+                col = col_match.group(1)
+                row = int(row_match.group(1)) - 1  # Convert to 0-based
+                
+                if row == row_index:
+                    # Delete this cell (don't add to new_cells)
+                    continue
+                elif row > row_index:
+                    # Shift this cell up by one row
+                    new_cell_id = f"{col}{row}"  # row is already 0-based, so this becomes row-1+1
+                    new_cells[new_cell_id] = cell_data
+                else:
+                    # Keep this cell in the same position
+                    new_cells[cell_id] = cell_data
+        
+        spreadsheet_data['cells'] = new_cells
+    
+    # Broadcast operation to all other users
+    await sio.emit('row_operation_applied', {
+        'type': operation_type,
+        'index': row_index,
+        'user_id': user_id,
+        'cells': spreadsheet_data['cells']
+    }, skip_sid=sid)
+
+@sio.event
+async def column_operation(sid, data):
+    """Handle column insert/delete operations"""
+    operation_type = data.get('type')  # 'insert' or 'delete'
+    col_index = data.get('index')
+    user_id = user_sessions.get(sid)
+    
+    if user_id not in active_users:
+        print(f"Invalid column_operation: user_id={user_id} not in active_users")
+        return
+    
+    user_name = active_users[user_id]['name']
+    print(f"Column operation from {user_name} ({user_id}): {operation_type} at index {col_index}")
+    
+    def col_index_to_letter(index):
+        """Convert column index to letter (0=A, 1=B, etc.)"""
+        return chr(65 + index)
+    
+    def letter_to_col_index(letter):
+        """Convert column letter to index (A=0, B=1, etc.)"""
+        return ord(letter) - 65
+    
+    if operation_type == 'insert':
+        # Shift all cells right that are at or after the insert index
+        new_cells = {}
+        for cell_id, cell_data in spreadsheet_data['cells'].items():
+            # Parse cell coordinates
+            col_match = re.match(r'^([A-Z]+)', cell_id)
+            row_match = re.search(r'(\d+)$', cell_id)
+            if col_match and row_match:
+                col_letter = col_match.group(1)
+                row = row_match.group(1)
+                col = letter_to_col_index(col_letter)
+                
+                if col >= col_index:
+                    # Shift this cell right by one column
+                    new_col_letter = col_index_to_letter(col + 1)
+                    new_cell_id = f"{new_col_letter}{row}"
+                    new_cells[new_cell_id] = cell_data
+                else:
+                    # Keep this cell in the same position
+                    new_cells[cell_id] = cell_data
+        
+        spreadsheet_data['cells'] = new_cells
+        
+    elif operation_type == 'delete':
+        # Remove all cells in the column and shift others left
+        new_cells = {}
+        for cell_id, cell_data in spreadsheet_data['cells'].items():
+            # Parse cell coordinates
+            col_match = re.match(r'^([A-Z]+)', cell_id)
+            row_match = re.search(r'(\d+)$', cell_id)
+            if col_match and row_match:
+                col_letter = col_match.group(1)
+                row = row_match.group(1)
+                col = letter_to_col_index(col_letter)
+                
+                if col == col_index:
+                    # Delete this cell (don't add to new_cells)
+                    continue
+                elif col > col_index:
+                    # Shift this cell left by one column
+                    new_col_letter = col_index_to_letter(col - 1)
+                    new_cell_id = f"{new_col_letter}{row}"
+                    new_cells[new_cell_id] = cell_data
+                else:
+                    # Keep this cell in the same position
+                    new_cells[cell_id] = cell_data
+        
+        spreadsheet_data['cells'] = new_cells
+    
+    # Broadcast operation to all other users
+    await sio.emit('column_operation_applied', {
+        'type': operation_type,
+        'index': col_index,
+        'user_id': user_id,
+        'cells': spreadsheet_data['cells']
+    }, skip_sid=sid)
+
 # HTTP endpoints
 @app.get("/")
 async def root():
