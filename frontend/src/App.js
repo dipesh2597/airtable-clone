@@ -175,6 +175,7 @@ function App() {
           socket={socket}
           spreadsheetData={spreadsheetData}
           onDataLoad={handleDataLoad}
+          showSidePanel={showSidePanel}
         />
         <Spreadsheet 
           socket={socket}

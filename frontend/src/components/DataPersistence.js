@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const DataPersistence = ({ socket, spreadsheetData, onDataLoad }) => {
+const DataPersistence = ({ socket, spreadsheetData, onDataLoad, showSidePanel }) => {
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('import'); // 'import'
   const [filename, setFilename] = useState('');
@@ -190,7 +190,7 @@ const DataPersistence = ({ socket, spreadsheetData, onDataLoad }) => {
           </div>
         </div>
         
-        <div className="flex items-center space-x-2">
+        <div className={`flex items-center space-x-2 ${!showSidePanel ? 'mr-16' : ''}`}>
           <button
             onClick={handleCsvExport}
             className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
