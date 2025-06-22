@@ -190,12 +190,4 @@ async def reset_spreadsheet():
     """Reset spreadsheet to initial state"""
     initialize_spreadsheet()
     await sio.emit('spreadsheet_reset', spreadsheet_data)
-    return {"message": "Spreadsheet reset successfully"}
-
-if __name__ == "__main__":
-    uvicorn.run(
-        "main:socket_app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True
-    ) 
+    return {"message": "Spreadsheet reset successfully"} 
