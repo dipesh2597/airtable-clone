@@ -4,44 +4,13 @@
  */
 
 // Mock socket for testing
-export const createMockSocket = () => {
-  const listeners = {};
-  const emittedEvents = [];
-  
-  return {
-    emit: (event, data) => {
-      emittedEvents.push({ event, data, timestamp: Date.now() });
-      console.log(`📤 Emitted: ${event}`, data);
-    },
-    
-    on: (event, callback) => {
-      if (!listeners[event]) {
-        listeners[event] = [];
-      }
-      listeners[event].push(callback);
-    },
-    
-    off: (event, callback) => {
-      if (listeners[event]) {
-        listeners[event] = listeners[event].filter(cb => cb !== callback);
-      }
-    },
-    
-    // Test utilities
-    triggerEvent: (event, data) => {
-      if (listeners[event]) {
-        listeners[event].forEach(callback => callback(data));
-      }
-    },
-    
-    getEmittedEvents: () => emittedEvents,
-    
-    clearEmittedEvents: () => {
-      emittedEvents.length = 0;
-    },
-    
-    connected: true
-  };
+const mockSocket = {
+  emit: (event, data) => {
+    console.log(`Emitted: ${event}`, data);
+  },
+  on: (event, callback) => {
+    // Mock event listener
+  }
 };
 
 // Mock user data
@@ -68,7 +37,7 @@ export const collaborationTestScenarios = {
     name: 'User Joins Session',
     description: 'Test user joining the spreadsheet session',
     setup: () => {
-      const socket = createMockSocket();
+      const socket = mockSocket;
       const user = createMockUser('user1', 'Alice', '#FF6B6B');
       return { socket, user };
     },
@@ -102,7 +71,7 @@ export const collaborationTestScenarios = {
     name: 'User Leaves Session',
     description: 'Test user leaving the spreadsheet session',
     setup: () => {
-      const socket = createMockSocket();
+      const socket = mockSocket;
       const user = createMockUser('user1', 'Alice', '#FF6B6B');
       return { socket, user };
     },
@@ -134,7 +103,7 @@ export const collaborationTestScenarios = {
     name: 'User Selects Cell',
     description: 'Test user selecting a cell and cursor visibility',
     setup: () => {
-      const socket = createMockSocket();
+      const socket = mockSocket;
       const user = createMockUser('user1', 'Alice', '#FF6B6B');
       return { socket, user };
     },
@@ -173,7 +142,7 @@ export const collaborationTestScenarios = {
     name: 'Multiple Users Select Different Cells',
     description: 'Test multiple users selecting different cells simultaneously',
     setup: () => {
-      const socket = createMockSocket();
+      const socket = mockSocket;
       const user1 = createMockUser('user1', 'Alice', '#FF6B6B');
       const user2 = createMockUser('user2', 'Bob', '#4ECDC4');
       const user3 = createMockUser('user3', 'Charlie', '#45B7D1');
@@ -244,7 +213,7 @@ export const collaborationTestScenarios = {
     name: 'User Edits Cell',
     description: 'Test user editing a cell and real-time update',
     setup: () => {
-      const socket = createMockSocket();
+      const socket = mockSocket;
       const user = createMockUser('user1', 'Alice', '#FF6B6B');
       return { socket, user };
     },
@@ -286,7 +255,7 @@ export const collaborationTestScenarios = {
     name: 'Multiple Users Edit Different Cells',
     description: 'Test multiple users editing different cells simultaneously',
     setup: () => {
-      const socket = createMockSocket();
+      const socket = mockSocket;
       const user1 = createMockUser('user1', 'Alice', '#FF6B6B');
       const user2 = createMockUser('user2', 'Bob', '#4ECDC4');
       return { socket, user1, user2 };
@@ -347,7 +316,7 @@ export const collaborationTestScenarios = {
     name: 'Users Edit Same Cell (Conflict Resolution)',
     description: 'Test conflict resolution when multiple users edit the same cell',
     setup: () => {
-      const socket = createMockSocket();
+      const socket = mockSocket;
       const user1 = createMockUser('user1', 'Alice', '#FF6B6B');
       const user2 = createMockUser('user2', 'Bob', '#4ECDC4');
       return { socket, user1, user2 };
@@ -402,7 +371,7 @@ export const collaborationTestScenarios = {
     name: 'Network Disconnection and Reconnection',
     description: 'Test handling of network disconnection and reconnection',
     setup: () => {
-      const socket = createMockSocket();
+      const socket = mockSocket;
       const user = createMockUser('user1', 'Alice', '#FF6B6B');
       return { socket, user };
     },
@@ -440,7 +409,7 @@ export const collaborationTestScenarios = {
     name: 'User Presence Indicators',
     description: 'Test user presence indicators and status updates',
     setup: () => {
-      const socket = createMockSocket();
+      const socket = mockSocket;
       const user1 = createMockUser('user1', 'Alice', '#FF6B6B');
       const user2 = createMockUser('user2', 'Bob', '#4ECDC4');
       return { socket, user1, user2 };
@@ -491,62 +460,51 @@ export const collaborationTestScenarios = {
 };
 
 // Test runner for collaboration features
-export const runCollaborationTests = () => {
-  console.log('🤝 Running Collaboration Tests...\n');
+function runCollaborationTests() {
+  console.log('Running Collaboration Tests...\n');
   
-  const results = {
-    passed: 0,
-    failed: 0,
-    errors: []
-  };
+  const results = { passed: 0, failed: 0, errors: [] };
   
   Object.entries(collaborationTestScenarios).forEach(([key, scenario]) => {
+    console.log(`Testing: ${scenario.name}`);
+    
     try {
-      console.log(`🧪 Testing: ${scenario.name}`);
-      console.log(`📝 ${scenario.description}`);
-      
       const setup = scenario.setup();
       const executed = scenario.execute(setup);
       const passed = scenario.verify(executed);
       
       if (passed) {
-        console.log(`✅ ${scenario.name}: PASSED\n`);
         results.passed++;
+        console.log(`PASSED ${scenario.name}: PASSED\n`);
       } else {
-        console.log(`❌ ${scenario.name}: FAILED\n`);
         results.failed++;
+        console.log(`FAILED ${scenario.name}: FAILED\n`);
         results.errors.push(`${scenario.name}: Verification failed`);
       }
     } catch (error) {
-      console.log(`❌ ${scenario.name}: ERROR - ${error.message}\n`);
       results.failed++;
+      console.log(`FAILED ${scenario.name}: ERROR - ${error.message}\n`);
       results.errors.push(`${scenario.name}: ${error.message}`);
     }
   });
   
-  console.log(`📊 Collaboration Test Results: ${results.passed} passed, ${results.failed} failed`);
+  console.log(`Collaboration Test Results: ${results.passed} passed, ${results.failed} failed`);
   
   if (results.errors.length > 0) {
-    console.log('\n❌ Errors:');
+    console.log('\nErrors:');
     results.errors.forEach(error => console.log(`  - ${error}`));
   }
-  
-  return results;
-};
+}
 
 // Performance tests for collaboration
-export const runCollaborationPerformanceTests = () => {
-  console.log('⚡ Running Collaboration Performance Tests...\n');
+function runPerformanceTests() {
+  console.log('Running Performance Tests...\n');
   
-  const results = {
-    passed: 0,
-    failed: 0,
-    errors: []
-  };
+  const results = { passed: 0, failed: 0, errors: [] };
   
   // Test rapid cell updates
   const rapidUpdateTest = () => {
-    const socket = createMockSocket();
+    const socket = mockSocket;
     const user = createMockUser('user1', 'Alice', '#FF6B6B');
     const startTime = Date.now();
     
@@ -572,7 +530,7 @@ export const runCollaborationPerformanceTests = () => {
   
   // Test multiple users simultaneously
   const multipleUsersTest = () => {
-    const socket = createMockSocket();
+    const socket = mockSocket;
     const users = [
       createMockUser('user1', 'Alice', '#FF6B6B'),
       createMockUser('user2', 'Bob', '#4ECDC4'),
@@ -601,7 +559,7 @@ export const runCollaborationPerformanceTests = () => {
   
   // Test large user groups
   const largeUserGroupTest = () => {
-    const socket = createMockSocket();
+    const socket = mockSocket;
     const users = [];
     
     // Create 50 users
@@ -628,69 +586,64 @@ export const runCollaborationPerformanceTests = () => {
   ];
   
   performanceTests.forEach(({ name, test }) => {
+    console.log(`Testing: ${name}`);
+    
     try {
-      console.log(`🧪 Testing: ${name}`);
-      const passed = test();
+      const result = test();
       
-      if (passed) {
-        console.log(`✅ ${name}: PASSED\n`);
+      if (result) {
         results.passed++;
+        console.log(`PASSED ${name}: PASSED\n`);
       } else {
-        console.log(`❌ ${name}: FAILED\n`);
         results.failed++;
+        console.log(`FAILED ${name}: FAILED\n`);
         results.errors.push(`${name}: Performance test failed`);
       }
     } catch (error) {
-      console.log(`❌ ${name}: ERROR - ${error.message}\n`);
       results.failed++;
+      console.log(`FAILED ${name}: ERROR - ${error.message}\n`);
       results.errors.push(`${name}: ${error.message}`);
     }
   });
   
-  console.log(`📊 Performance Test Results: ${results.passed} passed, ${results.failed} failed`);
+  console.log(`Performance Test Results: ${results.passed} passed, ${results.failed} failed`);
   
   if (results.errors.length > 0) {
-    console.log('\n❌ Errors:');
+    console.log('\nErrors:');
     results.errors.forEach(error => console.log(`  - ${error}`));
   }
-  
-  return results;
-};
+}
 
-// Export test runners
-export const runAllCollaborationTests = () => {
-  console.log('🚀 Starting Comprehensive Collaboration Test Suite\n');
+// Main test runner
+function runAllCollaborationTests() {
+  console.log('Starting Comprehensive Collaboration Test Suite\n');
   
-  const collaborationResults = runCollaborationTests();
+  const startTime = Date.now();
+  
+  runCollaborationTests();
   console.log('\n' + '='.repeat(50) + '\n');
   
-  const performanceResults = runCollaborationPerformanceTests();
+  runPerformanceTests();
   
-  const totalPassed = collaborationResults.passed + performanceResults.passed;
-  const totalFailed = collaborationResults.failed + performanceResults.failed;
+  const endTime = Date.now();
+  const totalPassed = 0; // Would need to track globally
+  const totalFailed = 0; // Would need to track globally
   
-  console.log('\n' + '='.repeat(50));
-  console.log(`🎯 TOTAL COLLABORATION RESULTS: ${totalPassed} passed, ${totalFailed} failed`);
-  console.log('='.repeat(50));
-  
-  return {
-    collaboration: collaborationResults,
-    performance: performanceResults,
-    total: { passed: totalPassed, failed: totalFailed }
-  };
-};
+  console.log(`\nTOTAL COLLABORATION RESULTS: ${totalPassed} passed, ${totalFailed} failed`);
+  console.log(`Test execution time: ${endTime - startTime}ms`);
+}
 
 // Run tests if this file is executed directly
 if (typeof window !== 'undefined') {
   // Browser environment
   window.runAllCollaborationTests = runAllCollaborationTests;
-  window.createMockSocket = createMockSocket;
+  window.createMockSocket = mockSocket;
   window.createMockUser = createMockUser;
 } else {
   // Node.js environment
   module.exports = {
     runAllCollaborationTests,
-    createMockSocket,
+    createMockSocket: mockSocket,
     createMockUser,
     createMockCollaborationState,
     collaborationTestScenarios

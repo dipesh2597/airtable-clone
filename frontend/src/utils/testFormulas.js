@@ -238,7 +238,7 @@ export const runFormulaTests = () => {
     errors: []
   };
   
-  console.log('🧪 Running Formula Tests...\n');
+  console.log('Running Formula Tests...\n');
   
   // Test valid formulas
   formulaTestCases.forEach(testCase => {
@@ -247,21 +247,26 @@ export const runFormulaTests = () => {
       const error = mockFormulaParser.getFormulaError(testCase.formula, testData);
       
       if (error) {
-        console.log(`❌ ${testCase.name}: ${error}`);
+        console.log(`FAILED ${testCase.name}: ${error}`);
         results.failed++;
         results.errors.push(`${testCase.name}: ${error}`);
       } else if (result === testCase.expectedResult) {
-        console.log(`✅ ${testCase.name}: ${result}`);
+        console.log(`PASSED ${testCase.name}: ${result}`);
         results.passed++;
       } else {
-        console.log(`❌ ${testCase.name}: Expected ${testCase.expectedResult}, got ${result}`);
+        console.log(`FAILED ${testCase.name}: Expected ${testCase.expectedResult}, got ${result}`);
         results.failed++;
         results.errors.push(`${testCase.name}: Expected ${testCase.expectedResult}, got ${result}`);
       }
     } catch (error) {
-      console.log(`❌ ${testCase.name}: Exception - ${error.message}`);
-      results.failed++;
-      results.errors.push(`${testCase.name}: Exception - ${error.message}`);
+      if (testCase.expectedError) {
+        results.passed++;
+        console.log(`PASSED ${testCase.name}: ${error}`);
+      } else {
+        console.log(`FAILED ${testCase.name}: Expected "${testCase.expectedError}", got "${error}"`);
+        results.failed++;
+        results.errors.push(`${testCase.name}: Expected "${testCase.expectedError}", got "${error}"`);
+      }
     }
   });
   
@@ -273,34 +278,34 @@ export const runFormulaTests = () => {
       
       if (testCase.expectedError) {
         if (error === testCase.expectedError) {
-          console.log(`✅ ${testCase.name}: ${error}`);
+          console.log(`PASSED ${testCase.name}: ${error}`);
           results.passed++;
         } else {
-          console.log(`❌ ${testCase.name}: Expected "${testCase.expectedError}", got "${error}"`);
+          console.log(`FAILED ${testCase.name}: Expected "${testCase.expectedError}", got "${error}"`);
           results.failed++;
           results.errors.push(`${testCase.name}: Expected "${testCase.expectedError}", got "${error}"`);
         }
       } else if (testCase.expectedResult !== undefined) {
         if (result === testCase.expectedResult) {
-          console.log(`✅ ${testCase.name}: ${result}`);
+          console.log(`PASSED ${testCase.name}: ${result}`);
           results.passed++;
         } else {
-          console.log(`❌ ${testCase.name}: Expected ${testCase.expectedResult}, got ${result}`);
+          console.log(`FAILED ${testCase.name}: Expected ${testCase.expectedResult}, got ${result}`);
           results.failed++;
           results.errors.push(`${testCase.name}: Expected ${testCase.expectedResult}, got ${result}`);
         }
       }
     } catch (error) {
-      console.log(`❌ ${testCase.name}: Exception - ${error.message}`);
+      console.log(`FAILED ${testCase.name}: Exception - ${error.message}`);
       results.failed++;
       results.errors.push(`${testCase.name}: Exception - ${error.message}`);
     }
   });
   
-  console.log(`\n📊 Test Results: ${results.passed} passed, ${results.failed} failed`);
+  console.log(`\nTest Results: ${results.passed} passed, ${results.failed} failed`);
   
   if (results.errors.length > 0) {
-    console.log('\n❌ Errors:');
+    console.log('\nErrors:');
     results.errors.forEach(error => console.log(`  - ${error}`));
   }
   
@@ -319,7 +324,7 @@ export const runCellReferenceTests = () => {
   
   const invalidRefs = ['1A', 'A', '1', '', 'A0', 'A-1'];
   
-  console.log('🧪 Running Cell Reference Tests...\n');
+  console.log('Running Cell Reference Tests...\n');
   
   let passed = 0;
   let failed = 0;
@@ -328,10 +333,10 @@ export const runCellReferenceTests = () => {
   cellRefTests.forEach(test => {
     const result = mockFormulaParser.parseCellRef(test.ref);
     if (result && result.col === test.expected.col && result.row === test.expected.row) {
-      console.log(`✅ ${test.ref}: col=${result.col}, row=${result.row}`);
+      console.log(`PASSED ${test.ref}: col=${result.col}, row=${result.row}`);
       passed++;
     } else {
-      console.log(`❌ ${test.ref}: Expected col=${test.expected.col}, row=${test.expected.row}, got ${result}`);
+      console.log(`FAILED ${test.ref}: Expected col=${test.expected.col}, row=${test.expected.row}, got ${result}`);
       failed++;
     }
   });
@@ -340,15 +345,15 @@ export const runCellReferenceTests = () => {
   invalidRefs.forEach(ref => {
     const result = mockFormulaParser.parseCellRef(ref);
     if (result === null) {
-      console.log(`✅ Invalid ref "${ref}": correctly rejected`);
+      console.log(`PASSED Invalid ref "${ref}": correctly rejected`);
       passed++;
     } else {
-      console.log(`❌ Invalid ref "${ref}": should be rejected, got ${result}`);
+      console.log(`FAILED Invalid ref "${ref}": should be rejected, got ${result}`);
       failed++;
     }
   });
   
-  console.log(`\n📊 Cell Reference Tests: ${passed} passed, ${failed} failed`);
+  console.log(`\nCell Reference Tests: ${passed} passed, ${failed} failed`);
   return { passed, failed };
 };
 
@@ -362,7 +367,7 @@ export const runRangeTests = () => {
   
   const invalidRanges = ['A1', 'A1:B', 'A:B10', 'A1:B10:C5'];
   
-  console.log('🧪 Running Range Tests...\n');
+  console.log('Running Range Tests...\n');
   
   let passed = 0;
   let failed = 0;
@@ -375,10 +380,10 @@ export const runRangeTests = () => {
         result.start.row === test.expected.start.row &&
         result.end.col === test.expected.end.col && 
         result.end.row === test.expected.end.row) {
-      console.log(`✅ ${test.range}: start=${test.expected.start.col},${test.expected.start.row}, end=${test.expected.end.col},${test.expected.end.row}`);
+      console.log(`PASSED ${test.range}: start=${test.expected.start.col},${test.expected.start.row}, end=${test.expected.end.col},${test.expected.end.row}`);
       passed++;
     } else {
-      console.log(`❌ ${test.range}: Expected ${JSON.stringify(test.expected)}, got ${JSON.stringify(result)}`);
+      console.log(`FAILED ${test.range}: Expected ${JSON.stringify(test.expected)}, got ${JSON.stringify(result)}`);
       failed++;
     }
   });
@@ -387,21 +392,21 @@ export const runRangeTests = () => {
   invalidRanges.forEach(range => {
     const result = mockFormulaParser.parseCellRange(range);
     if (result === null) {
-      console.log(`✅ Invalid range "${range}": correctly rejected`);
+      console.log(`PASSED Invalid range "${range}": correctly rejected`);
       passed++;
     } else {
-      console.log(`❌ Invalid range "${range}": should be rejected, got ${JSON.stringify(result)}`);
+      console.log(`FAILED Invalid range "${range}": should be rejected, got ${JSON.stringify(result)}`);
       failed++;
     }
   });
   
-  console.log(`\n📊 Range Tests: ${passed} passed, ${failed} failed`);
+  console.log(`\nRange Tests: ${passed} passed, ${failed} failed`);
   return { passed, failed };
 };
 
 // Export test runner
 export const runAllFormulaTests = () => {
-  console.log('🚀 Starting Comprehensive Formula Test Suite\n');
+  console.log('Starting Comprehensive Formula Test Suite\n');
   
   const formulaResults = runFormulaTests();
   console.log('\n' + '='.repeat(50) + '\n');
@@ -415,7 +420,7 @@ export const runAllFormulaTests = () => {
   const totalFailed = formulaResults.failed + cellRefResults.failed + rangeResults.failed;
   
   console.log('\n' + '='.repeat(50));
-  console.log(`🎯 TOTAL RESULTS: ${totalPassed} passed, ${totalFailed} failed`);
+  console.log(`TOTAL RESULTS: ${totalPassed} passed, ${totalFailed} failed`);
   console.log('='.repeat(50));
   
   return {

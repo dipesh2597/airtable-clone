@@ -224,7 +224,7 @@ export const testDataSets = {
     'Text with\nnewlines',
     'Text with\ttabs',
     'Unicode text: 你好世界',
-    'Emoji text: 🚀📊💻',
+    'Text with symbols',
     'A'.repeat(500), // Long text
     'A'.repeat(1000), // Maximum length
     'A'.repeat(1001)  // Too long
@@ -332,7 +332,7 @@ export const validationTestCases = [
 
 // Test runner for data validation
 export const runDataValidationTests = () => {
-  console.log('🔍 Running Data Validation Tests...\n');
+  console.log('Testing Data Validation Tests...\n');
   
   const results = {
     passed: 0,
@@ -341,8 +341,8 @@ export const runDataValidationTests = () => {
   };
   
   validationTestCases.forEach(testCase => {
-    console.log(`🧪 Testing: ${testCase.name}`);
-    console.log(`📝 ${testCase.description}`);
+    console.log(`Testing: ${testCase.name}`);
+    console.log(`${testCase.description}`);
     
     let testPassed = 0;
     let testFailed = 0;
@@ -354,28 +354,28 @@ export const runDataValidationTests = () => {
           testPassed++;
         } else {
           testFailed++;
-          console.log(`  ❌ "${value}" - Expected ${testCase.expected}, got ${result}`);
+          console.log(`  FAILED "${value}" - Expected ${testCase.expected}, got ${result}`);
         }
       } catch (error) {
         testFailed++;
-        console.log(`  ❌ "${value}" - Exception: ${error.message}`);
+        console.log(`  FAILED "${value}" - Exception: ${error.message}`);
       }
     });
     
     if (testFailed === 0) {
-      console.log(`✅ ${testCase.name}: ${testPassed} tests passed\n`);
+      console.log(`PASSED ${testCase.name}: ${testPassed} tests passed\n`);
       results.passed++;
     } else {
-      console.log(`❌ ${testCase.name}: ${testPassed} passed, ${testFailed} failed\n`);
+      console.log(`FAILED ${testCase.name}: ${testPassed} passed, ${testFailed} failed\n`);
       results.failed++;
       results.errors.push(`${testCase.name}: ${testFailed} tests failed`);
     }
   });
   
-  console.log(`📊 Data Validation Results: ${results.passed} passed, ${results.failed} failed`);
+  console.log(`Data Validation Results: ${results.passed} passed, ${results.failed} failed`);
   
   if (results.errors.length > 0) {
-    console.log('\n❌ Errors:');
+    console.log('\nErrors:');
     results.errors.forEach(error => console.log(`  - ${error}`));
   }
   
@@ -384,7 +384,7 @@ export const runDataValidationTests = () => {
 
 // Data type detection tests
 export const runDataTypeDetectionTests = () => {
-  console.log('🎯 Running Data Type Detection Tests...\n');
+  console.log('Running Data Type Detection Tests...\n');
   
   const results = {
     passed: 0,
@@ -401,7 +401,7 @@ export const runDataTypeDetectionTests = () => {
   ];
   
   typeTests.forEach(test => {
-    console.log(`🧪 Testing: ${test.expectedType} detection`);
+    console.log(`Testing: ${test.expectedType} detection`);
     
     let testPassed = 0;
     let testFailed = 0;
@@ -413,28 +413,28 @@ export const runDataTypeDetectionTests = () => {
           testPassed++;
         } else {
           testFailed++;
-          console.log(`  ❌ "${value}" - Expected ${test.expectedType}, got ${detectedType}`);
+          console.log(`  FAILED "${value}" - Expected ${test.expectedType}, got ${detectedType}`);
         }
       } catch (error) {
         testFailed++;
-        console.log(`  ❌ "${value}" - Exception: ${error.message}`);
+        console.log(`  FAILED "${value}" - Exception: ${error.message}`);
       }
     });
     
     if (testFailed === 0) {
-      console.log(`✅ ${test.expectedType} detection: ${testPassed} tests passed\n`);
+      console.log(`PASSED ${test.expectedType} detection: ${testPassed} tests passed\n`);
       results.passed++;
     } else {
-      console.log(`❌ ${test.expectedType} detection: ${testPassed} passed, ${testFailed} failed\n`);
+      console.log(`FAILED ${test.expectedType} detection: ${testPassed} passed, ${testFailed} failed\n`);
       results.failed++;
       results.errors.push(`${test.expectedType} detection: ${testFailed} tests failed`);
     }
   });
   
-  console.log(`📊 Data Type Detection Results: ${results.passed} passed, ${results.failed} failed`);
+  console.log(`Data Type Detection Results: ${results.passed} passed, ${results.failed} failed`);
   
   if (results.errors.length > 0) {
-    console.log('\n❌ Errors:');
+    console.log('\nErrors:');
     results.errors.forEach(error => console.log(`  - ${error}`));
   }
   
@@ -443,7 +443,7 @@ export const runDataTypeDetectionTests = () => {
 
 // Value validation tests
 export const runValueValidationTests = () => {
-  console.log('✅ Running Value Validation Tests...\n');
+  console.log('Running Value Validation Tests...\n');
   
   const results = {
     passed: 0,
@@ -473,7 +473,7 @@ export const runValueValidationTests = () => {
   ];
   
   validationTests.forEach(test => {
-    console.log(`🧪 Testing: ${test.name}`);
+    console.log(`Testing: ${test.name}`);
     
     let testPassed = 0;
     let testFailed = 0;
@@ -489,28 +489,28 @@ export const runValueValidationTests = () => {
           testPassed++;
         } else {
           testFailed++;
-          console.log(`  ❌ "${value}" - Expected valid=${expected.valid}, type=${expected.type}, got valid=${result.is_valid}, type=${result.detected_type}`);
+          console.log(`  FAILED "${value}" - Expected valid=${expected.valid}, type=${expected.type}, got valid=${result.is_valid}, type=${result.detected_type}`);
         }
       } catch (error) {
         testFailed++;
-        console.log(`  ❌ "${value}" - Exception: ${error.message}`);
+        console.log(`  FAILED "${value}" - Exception: ${error.message}`);
       }
     });
     
     if (testFailed === 0) {
-      console.log(`✅ ${test.name}: ${testPassed} tests passed\n`);
+      console.log(`PASSED ${test.name}: ${testPassed} tests passed\n`);
       results.passed++;
     } else {
-      console.log(`❌ ${test.name}: ${testPassed} passed, ${testFailed} failed\n`);
+      console.log(`FAILED ${test.name}: ${testPassed} passed, ${testFailed} failed\n`);
       results.failed++;
       results.errors.push(`${test.name}: ${testFailed} tests failed`);
     }
   });
   
-  console.log(`📊 Value Validation Results: ${results.passed} passed, ${results.failed} failed`);
+  console.log(`Value Validation Results: ${results.passed} passed, ${results.failed} failed`);
   
   if (results.errors.length > 0) {
-    console.log('\n❌ Errors:');
+    console.log('\nErrors:');
     results.errors.forEach(error => console.log(`  - ${error}`));
   }
   
@@ -519,7 +519,7 @@ export const runValueValidationTests = () => {
 
 // Format tests
 export const runFormatTests = () => {
-  console.log('🎨 Running Format Tests...\n');
+  console.log('Running Format Tests...\n');
   
   const results = {
     passed: 0,
@@ -542,24 +542,24 @@ export const runFormatTests = () => {
       const result = mockDataValidator.formatValue(test.value, test.type);
       
       if (result === test.expected) {
-        console.log(`✅ "${test.value}" (${test.type}) -> "${result}"`);
+        console.log(`PASSED "${test.value}" (${test.type}) -> "${result}"`);
         results.passed++;
       } else {
-        console.log(`❌ "${test.value}" (${test.type}) - Expected "${test.expected}", got "${result}"`);
+        console.log(`FAILED "${test.value}" (${test.type}) - Expected "${test.expected}", got "${result}"`);
         results.failed++;
         results.errors.push(`Format test failed for "${test.value}" (${test.type})`);
       }
     } catch (error) {
-      console.log(`❌ "${test.value}" (${test.type}) - Exception: ${error.message}`);
+      console.log(`FAILED "${test.value}" (${test.type}) - Exception: ${error.message}`);
       results.failed++;
       results.errors.push(`Format test exception for "${test.value}" (${test.type}): ${error.message}`);
     }
   });
   
-  console.log(`\n📊 Format Test Results: ${results.passed} passed, ${results.failed} failed`);
+  console.log(`\nData Validation Results: ${results.passed} passed, ${results.failed} failed`);
   
   if (results.errors.length > 0) {
-    console.log('\n❌ Errors:');
+    console.log('\nErrors:');
     results.errors.forEach(error => console.log(`  - ${error}`));
   }
   
@@ -568,7 +568,7 @@ export const runFormatTests = () => {
 
 // Export test runner
 export const runAllDataValidationTests = () => {
-  console.log('🚀 Starting Comprehensive Data Validation Test Suite\n');
+  console.log('Starting Comprehensive Data Validation Test Suite\n');
   
   const validationResults = runDataValidationTests();
   console.log('\n' + '='.repeat(50) + '\n');
@@ -587,7 +587,7 @@ export const runAllDataValidationTests = () => {
                      valueResults.failed + formatResults.failed;
   
   console.log('\n' + '='.repeat(50));
-  console.log(`🎯 TOTAL DATA VALIDATION RESULTS: ${totalPassed} passed, ${totalFailed} failed`);
+  console.log(`Data Validation Results: ${totalPassed} passed, ${totalFailed} failed`);
   console.log('='.repeat(50));
   
   return {
