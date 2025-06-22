@@ -279,9 +279,14 @@ def import_csv_to_excel(csv_content: str):
         return {"success": False, "error": str(e)}
 
 # --- On Startup ---
-ensure_excel_file()
-spreadsheet_data = excel_to_spreadsheet_data()
-print(f"Spreadsheet data: {spreadsheet_data}")
+try:
+    ensure_excel_file()
+    initialize_spreadsheet()
+    print("Backend initialized successfully")
+except Exception as e:
+    print(f"Error initializing backend: {e}")
+    # Initialize with empty data if Excel fails
+    initialize_spreadsheet()
 
 def get_next_color():
     """Get the next available color, excluding blue colors for focus mode"""
@@ -902,8 +907,27 @@ async def update_title_request(sid, data):
 # HTTP endpoints
 @app.get("/")
 async def root():
-    """Root endpoint"""
-    return {"message": "Airtable Clone API", "status": "running"}
+    """Root endpoint for healthcheck"""
+    try:
+        return {
+            "message": "Airtable Clone API is running!",
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "active_users": len(active_users),
+            "spreadsheet_cells": len(spreadsheet_data.get('cells', {}))
+        }
+    except Exception as e:
+        return {
+            "message": "Airtable Clone API is running but with errors",
+            "status": "degraded",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 @app.get("/api/spreadsheet")
 async def get_spreadsheet():
