@@ -13,6 +13,7 @@ function App() {
   const [activeUsers, setActiveUsers] = useState([]);
   const [spreadsheetData, setSpreadsheetData] = useState(null);
   const [showUserModal, setShowUserModal] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState('connecting');
 
   useEffect(() => {
     const newSocket = io(SOCKET_URL);
@@ -20,6 +21,15 @@ function App() {
 
     newSocket.on('connect', () => {
       console.log('Connected to server');
+      setConnectionStatus('connected');
+    });
+
+    newSocket.on('disconnect', () => {
+      setConnectionStatus('disconnected');
+    });
+
+    newSocket.on('connect_error', () => {
+      setConnectionStatus('error');
     });
 
     newSocket.on('spreadsheet_data', (data) => {
