@@ -54,12 +54,38 @@ def ensure_excel_file():
         wb = Workbook()
         ws = wb.active
         ws.title = "Sheet1"
-        # Pre-fill with empty values for 26 columns x 100 rows
-        for row in range(1, 101):
+        
+        # Sample expense data for new spreadsheets
+        sample_data = [
+            ["Category", "Date", "Cost"],
+            ["Groceries", "2025-06-01", "3200"],
+            ["Rent", "2025-06-01", "25000"],
+            ["Utilities", "2025-06-03", "1800"],
+            ["Dining", "2025-06-05", "1200"],
+            ["Transport", "2025-06-07", "900"],
+            ["Groceries", "2025-06-10", "2800"],
+            ["Shopping", "2025-06-11", "4500"],
+            ["Dining", "2025-06-13", "1500"],
+            ["Subscriptions", "2025-06-15", "999"],
+            ["Health", "2025-06-17", "2100"],
+            ["Fuel", "2025-06-20", "1600"],
+            ["Entertainment", "2025-06-21", "1300"]
+        ]
+        
+        # Fill in the sample data
+        for row_idx, row_data in enumerate(sample_data, 1):
+            for col_idx, value in enumerate(row_data, 1):
+                ws.cell(row=row_idx, column=col_idx, value=value)
+        
+        # Fill remaining cells with empty values
+        for row in range(len(sample_data) + 1, 101):
             for col in range(1, 27):
                 ws.cell(row=row, column=col, value="")
+        
         wb.save(EXCEL_PATH)
-        print(f"Created new Excel file at {EXCEL_PATH}")
+        print(f"Created new Excel file with sample data at {EXCEL_PATH}")
+    else:
+        print(f"Excel file already exists at {EXCEL_PATH}")
 
 
 def excel_to_spreadsheet_data():

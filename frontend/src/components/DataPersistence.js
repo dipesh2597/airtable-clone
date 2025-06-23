@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import config from '../config';
 
 const DataPersistence = ({ socket, spreadsheetData, onDataLoad, showSidePanel, onToggleSidePanel, activeUsers, userSelections }) => {
   const [showModal, setShowModal] = useState(false);
@@ -64,7 +65,7 @@ const DataPersistence = ({ socket, spreadsheetData, onDataLoad, showSidePanel, o
     try {
       const csvContent = await readFileAsText(csvImportFile);
       
-      const response = await fetch('http://localhost:8000/api/spreadsheet/import-csv', {
+      const response = await fetch(`${config.backendUrl}/api/spreadsheet/import-csv`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -105,7 +106,7 @@ const DataPersistence = ({ socket, spreadsheetData, onDataLoad, showSidePanel, o
     setMessage('');
     
     try {
-      const response = await fetch('http://localhost:8000/api/spreadsheet/export-csv');
+      const response = await fetch(`${config.backendUrl}/api/spreadsheet/export-csv`);
       const result = await response.json();
       setLoading(false);
       
@@ -184,36 +185,38 @@ const DataPersistence = ({ socket, spreadsheetData, onDataLoad, showSidePanel, o
     <>
       {/* Title and Save/Load buttons */}
       <div className="flex items-center justify-between p-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200 shadow-sm">
-        <div className="flex items-center space-x-4">
-          <div className="text-xl font-semibold text-gray-800 px-2 py-1 bg-white rounded-lg shadow-sm border border-blue-100">
+        <div className="flex items-center space-x-2 lg:space-x-4 min-w-0 flex-1">
+          <div className="text-lg lg:text-xl font-semibold text-gray-800 px-2 py-1 bg-white rounded-lg shadow-sm border border-blue-100 truncate">
             {title}
           </div>
         </div>
         
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1 lg:space-x-2 flex-shrink-0">
           <button
             onClick={handleCsvExport}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors"
+            className="px-2 lg:px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors text-sm lg:text-base"
           >
-            Export
+            <span className="hidden sm:inline">Export</span>
+            <span className="sm:hidden">📤</span>
           </button>
           <button
             onClick={() => openModal('import')}
-            className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors"
+            className="px-2 lg:px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors text-sm lg:text-base"
           >
-            Import
+            <span className="hidden sm:inline">Import</span>
+            <span className="sm:hidden">📥</span>
           </button>
           <button
             onClick={onToggleSidePanel}
-            className="ml-2 bg-white border border-gray-300 rounded-full p-2 shadow-sm hover:shadow-md transition-all duration-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transform hover:scale-105"
+            className="ml-1 lg:ml-2 bg-white border border-gray-300 rounded-full p-2 shadow-sm hover:shadow-md transition-all duration-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transform hover:scale-105 flex-shrink-0"
             title={showSidePanel ? "Hide Users Panel" : `Show Users Panel (${activeUsers?.filter(user => user.sid !== socket?.id).length || 0} online)`}
           >
             {showSidePanel ? (
-              <svg className="w-5 h-5 text-gray-600 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             ) : (
-              <svg className="w-5 h-5 text-gray-600 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
             )}
@@ -223,17 +226,17 @@ const DataPersistence = ({ socket, spreadsheetData, onDataLoad, showSidePanel, o
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 lg:p-6 w-full max-w-md mx-auto max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-800">
+              <h2 className="text-lg lg:text-xl font-semibold text-gray-800">
                 {modalType === 'import' && 'Import Data'}
               </h2>
               <button
                 onClick={() => setShowModal(false)}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-500 hover:text-gray-700 p-1"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 lg:w-6 lg:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -262,7 +265,7 @@ const DataPersistence = ({ socket, spreadsheetData, onDataLoad, showSidePanel, o
                     type="file"
                     accept=".csv,text/csv"
                     onChange={handleCsvFileInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm"
                   />
                   {csvImportFile && (
                     <p className="text-sm text-gray-600 mt-1">Selected: {csvImportFile.name}</p>
@@ -276,14 +279,14 @@ const DataPersistence = ({ socket, spreadsheetData, onDataLoad, showSidePanel, o
                 <div className="flex justify-end space-x-2 mt-4">
                   <button
                     onClick={() => setShowModal(false)}
-                    className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                    className="px-3 lg:px-4 py-2 text-gray-600 hover:text-gray-800 text-sm lg:text-base"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleCsvImport}
                     disabled={loading || !csvImportFile}
-                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
+                    className="px-3 lg:px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50 text-sm lg:text-base"
                   >
                     {loading ? 'Importing...' : 'Import'}
                   </button>

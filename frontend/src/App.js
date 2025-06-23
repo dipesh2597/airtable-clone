@@ -171,7 +171,7 @@ function App() {
     <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row">
       <div className="flex-1 overflow-hidden relative">
         {/* Root container with fixed height */}
-        <div className="h-screen flex flex-col pb-10">
+        <div className="h-screen flex flex-col">
           <DataPersistence 
             socket={socket}
             spreadsheetData={spreadsheetData}
@@ -181,7 +181,7 @@ function App() {
             activeUsers={activeUsers}
             userSelections={userSelections}
           />
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden pb-16 lg:pb-0">
             <Spreadsheet 
               socket={socket}
               user={user}
@@ -199,9 +199,10 @@ function App() {
         <div className="lg:hidden">
           {/* Mobile overlay */}
           <div className="fixed inset-0 bg-black bg-opacity-50 z-30" onClick={() => setShowSidePanel(false)} />
-          <div className="fixed right-0 top-0 h-full w-80 max-w-[80vw] bg-white shadow-lg z-40">
+          <div className="fixed right-0 top-0 h-full w-64 max-w-[55vw] bg-white shadow-lg z-40">
             <UserList 
-              users={activeUsers.filter(user => user.sid !== socket.id)} 
+              users={activeUsers.filter(user => user.sid !== socket.id)}
+              onClose={() => setShowSidePanel(false)}
             />
           </div>
         </div>
@@ -212,7 +213,7 @@ function App() {
         {showSidePanel && (
           <ResizablePanel>
             <UserList 
-              users={activeUsers.filter(user => user.sid !== socket.id)} 
+              users={activeUsers.filter(user => user.sid !== socket.id)}
             />
           </ResizablePanel>
         )}
