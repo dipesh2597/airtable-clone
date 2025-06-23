@@ -171,7 +171,7 @@ function App() {
     <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row">
       <div className="flex-1 overflow-hidden relative">
         {/* Root container with fixed height */}
-        <div className="h-screen flex flex-col">
+        <div className="h-screen flex flex-col pb-10">
           <DataPersistence 
             socket={socket}
             spreadsheetData={spreadsheetData}

@@ -729,6 +729,17 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
     dataRef.current = data;
   }, [data]);
 
+  // Prevent initial scroll up issue
+  useEffect(() => {
+    if (data && Object.keys(data.cells || {}).length > 0 && gridRef.current) {
+      // Only set scroll position if it's not already at the top
+      const container = gridRef.current.parentElement;
+      if (container && container.scrollTop > 0) {
+        container.scrollTop = 0;
+      }
+    }
+  }, [data]);
+
   const getGridStyle = () => {
     // Responsive grid layout
     const isMobile = windowSize.width < 640; // sm breakpoint
@@ -943,7 +954,7 @@ function Spreadsheet({ socket, user, data, setData, userSelections, setUserSelec
   };
 
   return (
-    <div className="h-full overflow-auto bg-white" style={{ scrollBehavior: 'smooth' }}>
+    <div className="h-full overflow-auto bg-white">
       <div className="sticky top-0 bg-white z-10">
         <div className="flex border-b-2 border-gray-400 select-none">
           <div className="w-12 sm:w-16 bg-gray-100 border-r border-gray-300 flex-shrink-0 select-none"></div>
